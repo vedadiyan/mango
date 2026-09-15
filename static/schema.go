@@ -34,8 +34,11 @@ type (
 		Dependencies map[string][]string
 	}
 
-	Array[T Scalar | Composite] struct {
-		Value T
+	ScalarArray struct {
+		Scalar
+	}
+	CompositeArray struct {
+		Composite
 	}
 
 	OneOf map[string]Property
@@ -83,6 +86,10 @@ func (Composite) void() {
 	justPanic()
 }
 
-func (Array[T]) void() {
+func (ScalarArray) void() {
+	justPanic()
+}
+
+func (CompositeArray) void() {
 	justPanic()
 }

@@ -31,9 +31,10 @@ type (
 )
 
 const (
-	ScalarType = "github.com/vedadiyan/mango/static.Scalar"
-	ObjectType = "github.com/vedadiyan/mango/static.Object"
-	ArrayType  = "github.com/vedadiyan/mango/static.Array"
+	ScalarType      = "github.com/vedadiyan/mango/static.Scalar"
+	ObjectType      = "github.com/vedadiyan/mango/static.Composite"
+	ScalarArrayType = "github.com/vedadiyan/mango/static.ScalarArray"
+	ObjectArrayType = "github.com/vedadiyan/mango/static.CompositeArray"
 )
 
 func Parse(filePath string) (*ParserContext, error) {
@@ -340,9 +341,13 @@ func (r TypedParam) GetType() ([]string, error) {
 		{
 			return []string{"object"}, nil
 		}
-	case ArrayType:
+	case ScalarArrayType:
 		{
-			return []string{"array"}, nil
+			out = append(out, "array")
+		}
+	case ObjectArrayType:
+		{
+			return []string{"array", "object"}, nil
 		}
 	default:
 		{

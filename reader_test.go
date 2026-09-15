@@ -30,6 +30,13 @@ func TestRead(t *testing.T) {
 			if err != nil {
 				t.FailNow()
 			}
+			if typ[0] == "object" {
+				xxx, err := schema.GetProperties()
+				if err != nil {
+					t.FailNow()
+				}
+				_ = xxx
+			}
 			_ = typ
 			required, err := value.GetRequired()
 			if err != nil {
