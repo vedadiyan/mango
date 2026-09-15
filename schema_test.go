@@ -6,7 +6,7 @@ func Export() static.Schema {
 	return static.Schema{
 		Title:       "Test Title",
 		Description: "Test Description",
-		Properties: map[string]static.Property{
+		Properties: static.Properties{
 			"FirstName": static.ScalarArray{
 				Title:    "Test First Name",
 				Type:     []static.Type{static.TypeString},
@@ -14,7 +14,7 @@ func Export() static.Schema {
 			},
 			"NestObject": static.Composite{
 				Title: "Test Nested Object",
-				Properties: map[string]static.Property{
+				Properties: static.Properties{
 					"A": static.Scalar{
 						Type: []static.Type{static.TypeBool},
 					},

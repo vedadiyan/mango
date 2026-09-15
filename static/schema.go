@@ -30,8 +30,8 @@ type (
 		Description  string
 		BsonName     string
 		Required     bool
-		Properties   map[string]Property
-		Dependencies map[string][]string
+		Properties   Properties
+		Dependencies Dependencies
 	}
 
 	ScalarArray struct {
@@ -41,18 +41,21 @@ type (
 		Composite
 	}
 
-	OneOf map[string]Property
-	AnyOf map[string]Property
-	AllOf map[string]Property
+	OneOf Properties
+	AnyOf Properties
+	AllOf Properties
 
 	Schema struct {
 		Title        string
 		Description  string
-		Properties   map[string]Property
-		Dependencies map[string][]string
+		Properties   Properties
+		Dependencies Dependencies
 	}
 
 	BasicType string
+
+	Properties   map[string]Property
+	Dependencies map[string][]string
 )
 
 const (
