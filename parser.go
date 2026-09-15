@@ -31,15 +31,9 @@ type (
 )
 
 const (
-	BasicType         = "github.com/vedadiyan/mango/static.BasicType"
-	StringDefinition  = "github.com/vedadiyan/mango/static.StringDefinition"
-	DoubleDefinition  = "github.com/vedadiyan/mango/static.DoubleDefinition"
-	DecimalDefinition = "github.com/vedadiyan/mango/static.DecimalDefinition"
-	LongDefinition    = "github.com/vedadiyan/mango/static.LongDefinition"
-	IntDefinition     = "github.com/vedadiyan/mango/static.IntDefinition"
-	ScalarType        = "github.com/vedadiyan/mango/static.Scalar"
-	ObjectType        = "github.com/vedadiyan/mango/static.Object"
-	ArrayType         = "github.com/vedadiyan/mango/static.Array"
+	ScalarType = "github.com/vedadiyan/mango/static.Scalar"
+	ObjectType = "github.com/vedadiyan/mango/static.Object"
+	ArrayType  = "github.com/vedadiyan/mango/static.Array"
 )
 
 func Parse(filePath string) (*ParserContext, error) {
