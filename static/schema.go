@@ -9,42 +9,20 @@ type (
 		void()
 	}
 
-	StringDefinition struct {
-		MinLen  int
-		MaxLen  int
-		Pattern string
-	}
-
-	DoubleDefinition struct {
+	Scalar struct {
+		Title        string
+		Description  string
+		BsonName     string
+		Type         []Type
+		Required     bool
 		Min          int
 		Max          int
 		ExclusiveMin bool
 		ExclusiveMax bool
 		MultipleOf   float64
-	}
-
-	DecimalDefinition struct {
-		DoubleDefinition
-	}
-
-	LongDefinition struct {
-		IntDefinition
-	}
-
-	IntDefinition struct {
-		Min          int
-		Max          int
-		ExclusiveMin bool
-		ExclusiveMax bool
-		MultipleOf   int
-	}
-
-	Scalar struct {
-		Title       string
-		Description string
-		BsonName    string
-		Type        []Type
-		Required    bool
+		MinLen       int
+		MaxLen       int
+		Pattern      string
 	}
 
 	Composite struct {
@@ -94,18 +72,6 @@ func justPanic() {
 }
 
 func (BasicType) void() {
-	justPanic()
-}
-
-func (StringDefinition) void() {
-	justPanic()
-}
-
-func (DoubleDefinition) void() {
-	justPanic()
-}
-
-func (IntDefinition) void() {
 	justPanic()
 }
 

@@ -30,27 +30,10 @@ type (
 	}
 )
 
-const (
-	BasicType         = "github.com/vedadiyan/mango/static.BasicType"
-	StringDefinition  = "github.com/vedadiyan/mango/static.StringDefinition"
-	DoubleDefinition  = "github.com/vedadiyan/mango/static.DoubleDefinition"
-	DecimalDefinition = "github.com/vedadiyan/mango/static.DecimalDefinition"
-	LongDefinition    = "github.com/vedadiyan/mango/static.LongDefinition"
-	IntDefinition     = "github.com/vedadiyan/mango/static.IntDefinition"
-)
-
-func ToBasonSchema(in TypedParam) (*BsonSchema, error) {
-	if in.TypeName != "" {
-		return nil, fmt.Errorf("")
-	}
-	typeValue, ok := in.Value.(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("")
-	}
-
+func ToBasonSchema(in map[string]any) (*BsonSchema, error) {
 	out := &BsonSchema{}
 
-	for key, value := range typeValue {
+	for key, value := range in {
 		switch key {
 		case "Title":
 			{
@@ -193,6 +176,7 @@ func ToBasonSchema(in TypedParam) (*BsonSchema, error) {
 									}
 								}
 							}
+							out.Type = types
 						}
 					}
 
@@ -214,7 +198,7 @@ func ToBasonSchema(in TypedParam) (*BsonSchema, error) {
 					if !ok {
 						return nil, fmt.Errorf("cannot determine type parameter")
 					}
-					res, err := ToBasonSchema(typeName)
+					res, err := ToBasonSchema(typeName.Value.(map[string]any))
 					if err != nil {
 						return nil, err
 					}

@@ -8,7 +8,6 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
-	"reflect"
 	"strconv"
 	"strings"
 )
@@ -27,6 +26,20 @@ type (
 		TypeName string
 		Value    any
 	}
+	RawSchema  map[string]any
+	Properties map[string]TypedParam
+)
+
+const (
+	BasicType         = "github.com/vedadiyan/mango/static.BasicType"
+	StringDefinition  = "github.com/vedadiyan/mango/static.StringDefinition"
+	DoubleDefinition  = "github.com/vedadiyan/mango/static.DoubleDefinition"
+	DecimalDefinition = "github.com/vedadiyan/mango/static.DecimalDefinition"
+	LongDefinition    = "github.com/vedadiyan/mango/static.LongDefinition"
+	IntDefinition     = "github.com/vedadiyan/mango/static.IntDefinition"
+	ScalarType        = "github.com/vedadiyan/mango/static.Scalar"
+	ObjectType        = "github.com/vedadiyan/mango/static.Object"
+	ArrayType         = "github.com/vedadiyan/mango/static.Array"
 )
 
 func Parse(filePath string) (*ParserContext, error) {
@@ -64,11 +77,19 @@ func (pc *ParserContext) ExtractFuncs() ([]*ast.FuncDecl, error) {
 	return out, nil
 }
 
-func (pc *ParserContext) ParseBasicLint(bl *ast.BasicLit) (string, error) {
+func (pc *ParserContext) ParseBasicLint(bl *ast.BasicLit) (any, error) {
 	switch bl.Kind {
-	case token.STRING, token.INT, token.FLOAT, token.IMAG, token.CHAR:
+	case token.STRING, token.IMAG, token.CHAR:
 		{
 			return strings.TrimRight(strings.TrimLeft(bl.Value, "\""), "\""), nil
+		}
+	case token.INT:
+		{
+			return strconv.Atoi(bl.Value)
+		}
+	case token.FLOAT:
+		{
+			return strconv.ParseFloat(bl.Value, 64)
 		}
 	default:
 		{
@@ -77,40 +98,11 @@ func (pc *ParserContext) ParseBasicLint(bl *ast.BasicLit) (string, error) {
 	}
 }
 
-func (pc *ParserContext) ParseVar(vr *types.Var, ident *ast.Ident, origin ast.Expr) (string, error) {
+func (pc *ParserContext) ParseVar(vr *types.Var, ident *ast.Ident) (string, error) {
 	if !vr.IsField() {
 		return "", fmt.Errorf("`%s` is not statically typed", ident.String())
 	}
 
-	if origin == nil {
-		return "", fmt.Errorf("`%s` cannot parse field without having reference to the struct", ident.String())
-	}
-
-	data, ok := pc.Info.Types[origin]
-	if !ok {
-		return "", fmt.Errorf("`%s` is not linked to a known type", ident.String())
-	}
-
-	strct, ok := data.Type.Underlying().(*types.Struct)
-	if !ok {
-		return "", fmt.Errorf("`%s` expected struct but found `%T`", ident.String(), data.Type.Underlying())
-	}
-
-	for i := range strct.NumFields() {
-		if strct.Field(i).Name() != vr.Name() {
-			continue
-		}
-		tag := strct.Tag(i)
-		if len(tag) == 0 {
-			break
-		}
-		nativeTag := reflect.StructTag(tag)
-		val, ok := nativeTag.Lookup("json")
-		if !ok {
-			break
-		}
-		return strings.Split(val, ",")[0], nil
-	}
 	return vr.Name(), nil
 }
 
@@ -138,7 +130,7 @@ func (pc *ParserContext) ParseIdent(ident *ast.Ident, origin ast.Expr) (any, err
 		}
 	case *types.Var:
 		{
-			return pc.ParseVar(t, ident, origin)
+			return pc.ParseVar(t, ident)
 		}
 	default:
 		{
@@ -177,8 +169,8 @@ func (pc *ParserContext) ParseCompositLit(current *ast.CompositeLit) ([]any, err
 	return out, nil
 }
 
-func (pc *ParserContext) ParseCompositLitAsMap(current *ast.CompositeLit) (map[string]any, error) {
-	out := make(map[string]any)
+func (pc *ParserContext) ParseCompositLitAsMap(current *ast.CompositeLit) (RawSchema, error) {
+	out := make(RawSchema)
 	for _, i := range current.Elts {
 		val, err := pc.ParseExpr(i, current)
 		if err != nil {
@@ -249,4 +241,188 @@ func (pc *ParserContext) ParseExpr(current ast.Expr, origin ast.Expr) (any, erro
 			return nil, fmt.Errorf("`%v` unsupported statement", t)
 		}
 	}
+}
+
+func (r RawSchema) GetTitle() (*string, error) {
+	return r.LookupCast[string]("Title")
+}
+
+func (r RawSchema) GetDescription() (*string, error) {
+	return r.LookupCast[string]("Description")
+}
+
+func (r TypedParam) GetSchema() (*RawSchema, error) {
+	return Cast[RawSchema](r.Value)
+}
+
+func (r TypedParam) GetBsonName() (*string, error) {
+	innerSchema, err := Cast[RawSchema](r.Value)
+	if err != nil {
+		return nil, err
+	}
+	return innerSchema.LookupCast[string]("BsonName")
+}
+
+func (r TypedParam) GetRequired() (*bool, error) {
+	innerSchema, err := Cast[RawSchema](r.Value)
+	if err != nil {
+		return nil, err
+	}
+	return innerSchema.LookupCast[bool]("Required")
+}
+
+func (r TypedParam) GetMinLen() (*int, error) {
+	innerSchema, err := Cast[RawSchema](r.Value)
+	if err != nil {
+		return nil, err
+	}
+	return innerSchema.LookupCast[int]("MinLen")
+}
+
+func (r TypedParam) GetMaxLen() (*int, error) {
+	innerSchema, err := Cast[RawSchema](r.Value)
+	if err != nil {
+		return nil, err
+	}
+	return innerSchema.LookupCast[int]("MaxLen")
+}
+
+func (r TypedParam) GetMin() (*int, error) {
+	innerSchema, err := Cast[RawSchema](r.Value)
+	if err != nil {
+		return nil, err
+	}
+	return innerSchema.LookupCast[int]("Min")
+}
+
+func (r TypedParam) GetMax() (*int, error) {
+	innerSchema, err := Cast[RawSchema](r.Value)
+	if err != nil {
+		return nil, err
+	}
+	return innerSchema.LookupCast[int]("Max")
+}
+
+func (r TypedParam) GetExclusiveMin() (*bool, error) {
+	innerSchema, err := Cast[RawSchema](r.Value)
+	if err != nil {
+		return nil, err
+	}
+	return innerSchema.LookupCast[bool]("ExclusiveMin")
+}
+
+func (r TypedParam) GetExclusiveMax() (*bool, error) {
+	innerSchema, err := Cast[RawSchema](r.Value)
+	if err != nil {
+		return nil, err
+	}
+	return innerSchema.LookupCast[bool]("ExclusiveMax")
+}
+
+func (r TypedParam) GetMultipleOf() (*float64, error) {
+	innerSchema, err := Cast[RawSchema](r.Value)
+	if err != nil {
+		return nil, err
+	}
+	return innerSchema.LookupCast[float64]("MultipleOf")
+}
+
+func (r TypedParam) GetPattern() (*string, error) {
+	innerSchema, err := Cast[RawSchema](r.Value)
+	if err != nil {
+		return nil, err
+	}
+	return innerSchema.LookupCast[string]("Pattern")
+}
+
+func (r TypedParam) GetType() ([]string, error) {
+	out := make([]string, 0)
+	switch r.TypeName {
+	case ScalarType:
+		{
+			break
+		}
+	case ObjectType:
+		{
+			return []string{"object"}, nil
+		}
+	case ArrayType:
+		{
+			return []string{"array"}, nil
+		}
+	default:
+		{
+			return nil, fmt.Errorf("unsupported type %s", r.TypeName)
+		}
+	}
+
+	innerSchema, err := Cast[RawSchema](r.Value)
+	if err != nil {
+		return nil, err
+	}
+
+	innerType, err := innerSchema.LookupCast[TypedParam]("Type")
+	if err != nil {
+		return nil, err
+	}
+
+	types, err := Cast[[]any](innerType.Value)
+	if err != nil {
+		return nil, err
+	}
+	for _, typ := range *types {
+		str, err := Cast[string](typ)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *str)
+	}
+
+	return out, nil
+}
+
+func (r RawSchema) GetProperties() (*Properties, error) {
+	typedParam, err := r.LookupCast[TypedParam]("Properties")
+	if err != nil {
+		return nil, err
+	}
+	rawSchema, err := Cast[RawSchema](typedParam.Value)
+	if err != nil {
+		return nil, err
+	}
+	properties := make(Properties)
+	for key, value := range *rawSchema {
+		typedParam, err := Cast[TypedParam](value)
+		if err != nil {
+			return nil, err
+		}
+		properties[key] = *typedParam
+	}
+
+	return &properties, nil
+}
+
+func Cast[T any](v any) (*T, error) {
+	val, ok := v.(T)
+	if !ok {
+		var zero T
+		return nil, fmt.Errorf("cannot convert %T to %T", v, zero)
+	}
+	return &val, nil
+}
+
+func (r RawSchema) LookupCast[T any](key string) (*T, error) {
+	return LookupCast[T](key, r)
+}
+
+func LookupCast[T any, R any](key string, mapper map[string]R) (*T, error) {
+	val, ok := mapper[key]
+	if !ok {
+		return nil, nil
+	}
+	return Cast[T](val)
+}
+
+func (r RawSchema) Lookup(key string) any {
+	return r[key]
 }
