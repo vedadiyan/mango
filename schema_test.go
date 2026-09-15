@@ -10,6 +10,8 @@ func Export() static.Schema {
 			"FirstName": static.ScalarArray{
 				Title:    "Test First Name",
 				Type:     []static.Type{static.TypeString},
+				MinLen:   3,
+				MaxLen:   100,
 				Required: true,
 			},
 			"NestObject": static.Composite{

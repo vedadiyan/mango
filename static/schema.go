@@ -12,7 +12,6 @@ type (
 	Scalar struct {
 		Title        string
 		Description  string
-		BsonName     string
 		Type         []Type
 		Required     bool
 		Min          int
@@ -28,7 +27,6 @@ type (
 	Composite struct {
 		Title        string
 		Description  string
-		BsonName     string
 		Required     bool
 		Properties   Properties
 		Dependencies Dependencies

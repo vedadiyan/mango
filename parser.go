@@ -250,14 +250,6 @@ func (r TypedParam) GetSchema() (*RawSchema, error) {
 	return Cast[RawSchema](r.Value)
 }
 
-func (r TypedParam) GetBsonName() (*string, error) {
-	innerSchema, err := Cast[RawSchema](r.Value)
-	if err != nil {
-		return nil, err
-	}
-	return innerSchema.LookupCast[string]("BsonName")
-}
-
 func (r TypedParam) GetRequired() (*bool, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
