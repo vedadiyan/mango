@@ -72,6 +72,10 @@ func ToBsonSchema(in TypedParam) (*BsonSchema, error) {
 	if err != nil {
 		return nil, err
 	}
+	dependencies, err := typeSchema.GetDependencies()
+	if err != nil {
+		return nil, err
+	}
 	typ, err := in.GetType()
 	if err != nil {
 		return nil, err
@@ -155,6 +159,7 @@ func ToBsonSchema(in TypedParam) (*BsonSchema, error) {
 	out.MaxProperties = maxPropertiesValue
 	out.MinProperties = minPropertiesValue
 	out.Enum = enum
+	out.Dependencies = dependencies
 
 	out.Properties = make(map[string]*BsonSchema)
 	switch firstOrDefault(typ) {

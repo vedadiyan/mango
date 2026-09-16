@@ -460,11 +460,11 @@ func (r TypedParam) GetType() ([]string, error) {
 		return nil, nil
 	}
 
-	types, err := Cast[[]any](innerType.Value)
+	types, err := CopyCast[[]any](innerType.Value)
 	if err != nil {
 		return nil, err
 	}
-	for _, typ := range *types {
+	for _, typ := range types {
 		str, err := Cast[string](typ)
 		if err != nil {
 			return nil, err
@@ -507,12 +507,12 @@ func (r RawSchema) GetItems() (Items, error) {
 	if typedParam == nil {
 		return nil, nil
 	}
-	rawSchema, err := Cast[[]any](typedParam.Value)
+	rawSchema, err := CopyCast[[]any](typedParam.Value)
 	if err != nil {
 		return nil, err
 	}
 	items := make(Items, 0)
-	for _, value := range *rawSchema {
+	for _, value := range rawSchema {
 		typedParam, err := Cast[TypedParam](value)
 		if err != nil {
 			return nil, err
@@ -534,12 +534,12 @@ func (r RawSchema) GetSpecs() (Items, error) {
 	if typedParam == nil {
 		return nil, nil
 	}
-	rawSchema, err := Cast[[]any](typedParam.Value)
+	rawSchema, err := CopyCast[[]any](typedParam.Value)
 	if err != nil {
 		return nil, err
 	}
 	items := make(Items, 0)
-	for _, value := range *rawSchema {
+	for _, value := range rawSchema {
 		typedParam, err := Cast[TypedParam](value)
 		if err != nil {
 			return nil, err
@@ -553,6 +553,48 @@ func (r RawSchema) GetSpecs() (Items, error) {
 	return items, nil
 }
 
+func (r RawSchema) GetDependencies() (map[string][]string, error) {
+	typedParam, err := r.LookupCast[TypedParam]("Dependencies")
+	if err != nil {
+		return nil, err
+	}
+	if typedParam == nil {
+		return nil, nil
+	}
+	rawSchema, err := Cast[RawSchema](typedParam.Value)
+	if err != nil {
+		return nil, err
+	}
+	dependencies := make(map[string][]string)
+	for key, value := range *rawSchema {
+		typedParam, err := Cast[TypedParam](value)
+		if err != nil {
+			return nil, err
+		}
+		if typedParam == nil {
+			continue
+		}
+		rawValues, err := CopyCast[[]any](typedParam.Value)
+		if err != nil {
+			return nil, err
+		}
+		if rawValues == nil {
+			continue
+		}
+		l := len(rawValues)
+		values := make([]string, l)
+		for i := range l {
+			value, err := CopyCast[string](rawValues[i])
+			if err != nil {
+				return nil, err
+			}
+			values[i] = value
+		}
+		dependencies[key] = values
+	}
+	return dependencies, nil
+}
+
 func Cast[T any](v any) (*T, error) {
 	val, ok := v.(T)
 	if !ok {
@@ -560,6 +602,15 @@ func Cast[T any](v any) (*T, error) {
 		return nil, fmt.Errorf("cannot convert %T to %T", v, zero)
 	}
 	return &val, nil
+}
+
+func CopyCast[T any](v any) (T, error) {
+	val, ok := v.(T)
+	if !ok {
+		var zero T
+		return zero, fmt.Errorf("cannot convert %T to %T", v, zero)
+	}
+	return val, nil
 }
 
 func (r RawSchema) LookupCast[T any](key string) (*T, error) {
