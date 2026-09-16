@@ -9,7 +9,6 @@ import (
 	"go/token"
 	"go/types"
 	"strconv"
-	"strings"
 )
 
 type (
@@ -76,7 +75,7 @@ func (pc *ParserContext) ParseBasicLint(bl *ast.BasicLit) (any, error) {
 	switch bl.Kind {
 	case token.STRING, token.IMAG, token.CHAR:
 		{
-			return strings.TrimRight(strings.TrimLeft(bl.Value, "\""), "\""), nil
+			return strconv.Unquote(bl.Value)
 		}
 	case token.INT:
 		{
