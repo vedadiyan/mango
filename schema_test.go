@@ -8,7 +8,7 @@ func Export() static.Schema {
 		Description: "Test Description",
 		Properties: static.Properties{
 			"FirstName": static.Array{
-				Items: []static.Type{
+				Items: static.Items{
 					static.Scalar{
 						Type:     []static.BasicType{static.TypeString},
 						MinLen:   3,

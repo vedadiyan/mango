@@ -204,7 +204,7 @@ func (pc *ParserContext) ParseExpr(current ast.Expr, origin ast.Expr) (any, erro
 			if !ok {
 				return nil, fmt.Errorf("`%v` is not present", t)
 			}
-			switch typ.Type.(type) {
+			switch typ.Type.Underlying().(type) {
 			case *types.Slice, *types.Array:
 				{
 					out, err := pc.ParseCompositLit(t)

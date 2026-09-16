@@ -18,7 +18,7 @@ func TestRead(t *testing.T) {
 		if err != nil {
 			t.FailNow()
 		}
-		out, err := json.Marshal(value)
+		out, err := json.MarshalIndent(value, "", "\t")
 		if err != nil {
 			t.FailNow()
 		}

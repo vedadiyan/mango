@@ -6,7 +6,7 @@ type (
 	}
 
 	Property interface {
-		void()
+		property()
 	}
 
 	Index struct {
@@ -37,7 +37,7 @@ type (
 		Title                string
 		Description          string
 		Required             bool
-		Properties           Properties
+		Properties           Specs
 		Dependencies         Dependencies
 		MaxProperties        int
 		MinProperties        int
@@ -46,7 +46,7 @@ type (
 	}
 
 	Array struct {
-		Items           []Type
+		Items           Specs
 		MinItems        int
 		MaxItems        int
 		UniqueItems     bool
@@ -54,19 +54,24 @@ type (
 		Index           Index
 	}
 
-	OneOf Properties
-	AnyOf Properties
-	AllOf Properties
+	OneOf Items
+	AnyOf Items
+	AllOf Items
 
 	Schema struct {
 		Title        string
 		Description  string
-		Properties   Properties
+		Properties   Specs
 		Dependencies Dependencies
 	}
 
 	BasicType string
 
+	Specs interface {
+		spec()
+	}
+
+	Items        []Property
 	Properties   map[string]Property
 	Dependencies map[string][]string
 )
@@ -90,14 +95,22 @@ func justPanic() {
 	panic("this method should never be called")
 }
 
-func (Scalar) void() {
+func (Scalar) property() {
 	justPanic()
 }
 
-func (Composite) void() {
+func (Composite) property() {
 	justPanic()
 }
 
-func (Array) void() {
+func (Array) property() {
+	justPanic()
+}
+
+func (Items) spec() {
+	justPanic()
+}
+
+func (Properties) spec() {
 	justPanic()
 }
