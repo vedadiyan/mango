@@ -34,6 +34,10 @@ const (
 	ScalarType = "github.com/vedadiyan/mango/static.Scalar"
 	ObjectType = "github.com/vedadiyan/mango/static.Composite"
 	ArrayType  = "github.com/vedadiyan/mango/static.Array"
+	OneOf      = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.OneOf]"
+	AnyOf      = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.AnyOf]"
+	AllOf      = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.AllOf]"
+	Not        = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.Not]"
 )
 
 func Parse(filePath string) (*ParserContext, error) {
@@ -425,6 +429,22 @@ func (r TypedParam) GetType() ([]string, error) {
 		{
 			return []string{"array"}, nil
 		}
+	case OneOf:
+		{
+			return []string{"oneof"}, nil
+		}
+	case AnyOf:
+		{
+			return []string{"anyof"}, nil
+		}
+	case AllOf:
+		{
+			return []string{"allof"}, nil
+		}
+	case Not:
+		{
+			return []string{"not"}, nil
+		}
 	}
 
 	innerSchema, err := Cast[RawSchema](r.Value)
@@ -481,6 +501,33 @@ func (r RawSchema) GetProperties() (Properties, error) {
 
 func (r RawSchema) GetItems() (Items, error) {
 	typedParam, err := r.LookupCast[TypedParam]("Items")
+	if err != nil {
+		return nil, err
+	}
+	if typedParam == nil {
+		return nil, nil
+	}
+	rawSchema, err := Cast[[]any](typedParam.Value)
+	if err != nil {
+		return nil, err
+	}
+	items := make(Items, 0)
+	for _, value := range *rawSchema {
+		typedParam, err := Cast[TypedParam](value)
+		if err != nil {
+			return nil, err
+		}
+		if typedParam == nil {
+			continue
+		}
+		items = append(items, *typedParam)
+	}
+
+	return items, nil
+}
+
+func (r RawSchema) GetSpecs() (Items, error) {
+	typedParam, err := r.LookupCast[TypedParam]("Specs")
 	if err != nil {
 		return nil, err
 	}

@@ -40,6 +40,7 @@ type (
 		AnyOf []*BsonSchema `json:"anyOf,omitempty"`
 		OneOf []*BsonSchema `json:"oneOf,omitempty"`
 		AllOf []*BsonSchema `json:"allOf,omitempty"`
+		Not   *BsonSchema   `json:"Not,omitempty"`
 
 		index Index
 	}
@@ -64,6 +65,10 @@ func ToBsonSchema(in TypedParam) (*BsonSchema, error) {
 		return nil, err
 	}
 	items, err := typeSchema.GetItems()
+	if err != nil {
+		return nil, err
+	}
+	specs, err := typeSchema.GetSpecs()
 	if err != nil {
 		return nil, err
 	}
@@ -150,34 +155,85 @@ func ToBsonSchema(in TypedParam) (*BsonSchema, error) {
 	out.MaxProperties = maxPropertiesValue
 	out.MinProperties = minPropertiesValue
 	out.Enum = enum
-	out.Type = typ
 
 	out.Properties = make(map[string]*BsonSchema)
-	out.Items = make([]*BsonSchema, 0)
-	out.Required = make([]string, 0)
+	switch firstOrDefault(typ) {
+	case "oneof":
+		{
+			for _, item := range specs {
+				bsonSchema, err := ToBsonSchema(item)
+				if err != nil {
+					return nil, err
+				}
+				out.OneOf = append(out.Items, bsonSchema)
+			}
+		}
+	case "anyof":
+		{
+			for _, item := range specs {
+				bsonSchema, err := ToBsonSchema(item)
+				if err != nil {
+					return nil, err
+				}
+				out.AnyOf = append(out.Items, bsonSchema)
+			}
+		}
+	case "allof":
+		{
+			for _, item := range specs {
+				bsonSchema, err := ToBsonSchema(item)
+				if err != nil {
+					return nil, err
+				}
+				out.AllOf = append(out.Items, bsonSchema)
+			}
+		}
+	case "not":
+		{
+			for i := 0; i < 1 && i < len(specs); i++ {
+				bsonSchema, err := ToBsonSchema(specs[i])
+				if err != nil {
+					return nil, err
+				}
+				out.Not = bsonSchema
+			}
+		}
+	default:
+		{
+			out.Type = typ
+			for key, value := range properties {
+				bsonSchema, err := ToBsonSchema(value)
+				if err != nil {
+					return nil, err
+				}
+				required, err := value.GetRequired()
+				if err != nil {
+					return nil, err
+				}
+				if required != nil && *required == true {
+					out.Required = append(out.Required, key)
+				}
+				out.Properties[key] = bsonSchema
+			}
 
-	for key, value := range properties {
-		bsonSchema, err := ToBsonSchema(value)
-		if err != nil {
-			return nil, err
-		}
-		required, err := value.GetRequired()
-		if err != nil {
-			return nil, err
-		}
-		if required != nil && *required == true {
-			out.Required = append(out.Required, key)
-		}
-		out.Properties[key] = bsonSchema
-	}
+			for _, item := range items {
+				bsonSchema, err := ToBsonSchema(item)
+				if err != nil {
+					return nil, err
+				}
+				out.Items = append(out.Items, bsonSchema)
+			}
 
-	for _, item := range items {
-		bsonSchema, err := ToBsonSchema(item)
-		if err != nil {
-			return nil, err
 		}
-		out.Items = append(out.Items, bsonSchema)
 	}
 
 	return out, nil
+}
+
+func firstOrDefault[T any](in []T) T {
+	if len(in) == 0 {
+		var zero T
+		return zero
+	}
+	return in[0]
 }

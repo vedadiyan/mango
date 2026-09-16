@@ -17,13 +17,13 @@ func Export() static.Schema {
 					},
 				},
 			},
-			"NestObject": static.Composite{
+			"NestObject": static.Combinator[static.AnyOf]{
 				Title: "Test Nested Object",
-				Properties: static.Properties{
-					"A": static.Scalar{
-						Type:     []static.BasicType{static.TypeInt},
-						Min:      10,
-						Max:      10000,
+				Specs: static.AnyOf{
+					static.Scalar{
+						Type:     []static.BasicType{static.TypeString},
+						MinLen:   3,
+						MaxLen:   100,
 						Required: true,
 					},
 				},
