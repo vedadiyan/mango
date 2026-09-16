@@ -10,9 +10,10 @@ func Export() static.Schema {
 			"FirstName": static.Array{
 				Items: []static.Type{
 					static.Scalar{
-						Type:   []static.BasicType{static.TypeString},
-						MinLen: 3,
-						MaxLen: 100,
+						Type:     []static.BasicType{static.TypeString},
+						MinLen:   3,
+						MaxLen:   100,
+						Required: true,
 					},
 				},
 			},
@@ -20,9 +21,10 @@ func Export() static.Schema {
 				Title: "Test Nested Object",
 				Properties: static.Properties{
 					"A": static.Scalar{
-						Type: []static.BasicType{static.TypeInt},
-						Min:  10,
-						Max:  10000,
+						Type:     []static.BasicType{static.TypeInt},
+						Min:      10,
+						Max:      10000,
+						Required: true,
 					},
 				},
 			},

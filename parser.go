@@ -346,6 +346,53 @@ func (r TypedParam) GetUniqueItems() (*bool, error) {
 	return innerSchema.LookupCast[bool]("UniqueItems")
 }
 
+func (r TypedParam) GetMinProperties() (*int, error) {
+	innerSchema, err := Cast[RawSchema](r.Value)
+	if err != nil {
+		return nil, err
+	}
+	return innerSchema.LookupCast[int]("MinProperties")
+}
+
+func (r TypedParam) GetMaxProperties() (*int, error) {
+	innerSchema, err := Cast[RawSchema](r.Value)
+	if err != nil {
+		return nil, err
+	}
+	return innerSchema.LookupCast[int]("MaxProperties")
+}
+
+func (r TypedParam) GetAdditionalItems() (*bool, error) {
+	innerSchema, err := Cast[RawSchema](r.Value)
+	if err != nil {
+		return nil, err
+	}
+	return innerSchema.LookupCast[bool]("AdditionalItems")
+}
+
+func (r TypedParam) GetAdditionalProperties() (*bool, error) {
+	innerSchema, err := Cast[RawSchema](r.Value)
+	if err != nil {
+		return nil, err
+	}
+	return innerSchema.LookupCast[bool]("AdditionalProperties")
+}
+
+func (r TypedParam) GetEnum() ([]any, error) {
+	innerSchema, err := Cast[RawSchema](r.Value)
+	if err != nil {
+		return nil, err
+	}
+	enum, err := innerSchema.LookupCast[[]any]("Enum")
+	if err != nil {
+		return nil, err
+	}
+	if enum == nil {
+		return nil, nil
+	}
+	return *enum, nil
+}
+
 func (r TypedParam) GetType() ([]string, error) {
 	out := make([]string, 0)
 	switch r.TypeName {

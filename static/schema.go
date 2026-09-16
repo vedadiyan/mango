@@ -22,21 +22,26 @@ type (
 		MinLen       int
 		MaxLen       int
 		Pattern      string
+		Enum         []any
 	}
 
 	Composite struct {
-		Title        string
-		Description  string
-		Required     bool
-		Properties   Properties
-		Dependencies Dependencies
+		Title                string
+		Description          string
+		Required             bool
+		Properties           Properties
+		Dependencies         Dependencies
+		MaxProperties        int
+		MinProperties        int
+		AdditionalProperties bool
 	}
 
 	Array struct {
-		Items       []Type
-		MinItems    int
-		MaxItems    int
-		UniqueItems bool
+		Items           []Type
+		MinItems        int
+		MaxItems        int
+		UniqueItems     bool
+		AdditionalItems bool
 	}
 
 	OneOf Properties

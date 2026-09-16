@@ -2,31 +2,38 @@ package mango
 
 type (
 	BsonSchema struct {
-		Title        *string
-		Description  *string
-		Type         []string
-		Properties   map[string]*BsonSchema
-		Items        []*BsonSchema
-		Required     []string
-		Dependencies map[string][]string
+		Title        *string                `json:"title,omitempty"`
+		Description  *string                `json:"description,omitempty"`
+		Type         []string               `json:"bsonType,omitempty"`
+		Properties   map[string]*BsonSchema `json:"properties,omitempty"`
+		Items        []*BsonSchema          `json:"items,omitempty"`
+		Required     []string               `json:"required,omitempty"`
+		Dependencies map[string][]string    `json:"dependencies,omitempty"`
+		Enum         []any                  `json:"enum,omitempty"`
 
-		MinLen  *int
-		MaxLen  *int
-		Pattern *string
+		MinLen  *int    `json:"minLength,omitempty"`
+		MaxLen  *int    `json:"maxLength,omitempty"`
+		Pattern *string `json:"pattern,omitempty"`
 
-		Min          *int
-		Max          *int
-		ExclusiveMin *bool
-		ExclusiveMax *bool
-		MultipleOf   *float64
+		Min          *int     `json:"minimum,omitempty"`
+		Max          *int     `json:"maximum,omitempty"`
+		ExclusiveMin *bool    `json:"exclusiveMinimum,omitempty"`
+		ExclusiveMax *bool    `json:"exclusiveMaximum,omitempty"`
+		MultipleOf   *float64 `json:"multipleOf,omitempty"`
 
-		MinItems    *int
-		MaxItems    *int
-		UniqueItems *bool
+		MinItems    *int  `json:"minItems,omitempty"`
+		MaxItems    *int  `json:"maxItems,omitempty"`
+		UniqueItems *bool `json:"uniqueItems,omitempty"`
 
-		AnyOf []*BsonSchema
-		OneOf []*BsonSchema
-		AllOf []*BsonSchema
+		MaxProperties *int `json:"maxProperties,omitempty"`
+		MinProperties *int `json:"minProperties,omitempty"`
+
+		AdditionalItems      *bool `json:"additionalItems,omitempty"`
+		AdditionalProperties *bool `json:"additionalProperties,omitempty"`
+
+		AnyOf []*BsonSchema `json:"anyOf,omitempty"`
+		OneOf []*BsonSchema `json:"oneOf,omitempty"`
+		AllOf []*BsonSchema `json:"allOf,omitempty"`
 	}
 )
 
@@ -97,6 +104,26 @@ func ToBsonSchema(in TypedParam) (*BsonSchema, error) {
 	if err != nil {
 		return nil, err
 	}
+	additionalItemsValue, err := in.GetAdditionalItems()
+	if err != nil {
+		return nil, err
+	}
+	additionalPropertiesValue, err := in.GetAdditionalProperties()
+	if err != nil {
+		return nil, err
+	}
+	maxPropertiesValue, err := in.GetMaxProperties()
+	if err != nil {
+		return nil, err
+	}
+	minPropertiesValue, err := in.GetMinProperties()
+	if err != nil {
+		return nil, err
+	}
+	enum, err := in.GetEnum()
+	if err != nil {
+		return nil, err
+	}
 
 	out.Title = title
 	out.Description = description
@@ -110,6 +137,11 @@ func ToBsonSchema(in TypedParam) (*BsonSchema, error) {
 	out.MinItems = minItemsValue
 	out.MaxItems = maxItemsValue
 	out.UniqueItems = uniqueItemsValue
+	out.AdditionalItems = additionalItemsValue
+	out.AdditionalProperties = additionalPropertiesValue
+	out.MaxProperties = maxPropertiesValue
+	out.MinProperties = minPropertiesValue
+	out.Enum = enum
 	out.Type = typ
 
 	out.Properties = make(map[string]*BsonSchema)
