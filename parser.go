@@ -71,7 +71,7 @@ func (pc *ParserContext) ExtractFuncs() ([]*ast.FuncDecl, error) {
 	return out, nil
 }
 
-func (pc *ParserContext) ParseBasicLint(bl *ast.BasicLit) (any, error) {
+func (pc *ParserContext) ParseBasicLit(bl *ast.BasicLit) (any, error) {
 	switch bl.Kind {
 	case token.STRING, token.CHAR:
 		{
@@ -79,7 +79,7 @@ func (pc *ParserContext) ParseBasicLint(bl *ast.BasicLit) (any, error) {
 		}
 	case token.INT:
 		{
-			val := constant.MakeFromLiteral(bl.Value, token.INT, 0)
+			val := constant.MakeFromLiteral(bl.Value, bl.Kind, 0)
 			num, ok := constant.Int64Val(val)
 			if !ok {
 				return "", fmt.Errorf("`%s` is not int", bl.Value)
@@ -88,7 +88,7 @@ func (pc *ParserContext) ParseBasicLint(bl *ast.BasicLit) (any, error) {
 		}
 	case token.FLOAT, token.IMAG:
 		{
-			val := constant.MakeFromLiteral(bl.Value, token.INT, 0)
+			val := constant.MakeFromLiteral(bl.Value, bl.Kind, 0)
 			num, ok := constant.Float64Val(val)
 			if !ok {
 				return "", fmt.Errorf("`%s` is not float", bl.Value)
@@ -201,7 +201,7 @@ func (pc *ParserContext) ParseExpr(current ast.Expr, origin ast.Expr) (any, erro
 	switch t := current.(type) {
 	case *ast.BasicLit:
 		{
-			return pc.ParseBasicLint(t)
+			return pc.ParseBasicLit(t)
 		}
 	case *ast.Ident:
 		{
