@@ -73,17 +73,27 @@ func (pc *ParserContext) ExtractFuncs() ([]*ast.FuncDecl, error) {
 
 func (pc *ParserContext) ParseBasicLint(bl *ast.BasicLit) (any, error) {
 	switch bl.Kind {
-	case token.STRING, token.IMAG, token.CHAR:
+	case token.STRING, token.CHAR:
 		{
 			return strconv.Unquote(bl.Value)
 		}
 	case token.INT:
 		{
-			return strconv.Atoi(bl.Value)
+			val := constant.MakeFromLiteral(bl.Value, token.INT, 0)
+			num, ok := constant.Int64Val(val)
+			if !ok {
+				return "", fmt.Errorf("`%s` is not int", bl.Value)
+			}
+			return num, nil
 		}
-	case token.FLOAT:
+	case token.FLOAT, token.IMAG:
 		{
-			return strconv.ParseFloat(bl.Value, 64)
+			val := constant.MakeFromLiteral(bl.Value, token.INT, 0)
+			num, ok := constant.Float64Val(val)
+			if !ok {
+				return "", fmt.Errorf("`%s` is not float", bl.Value)
+			}
+			return num, nil
 		}
 	default:
 		{
@@ -109,13 +119,21 @@ func (pc *ParserContext) ParseIdent(ident *ast.Ident, origin ast.Expr) (any, err
 	case *types.Const:
 		{
 			if t.Val().Kind() == constant.Int {
-				return strconv.Atoi(t.Val().ExactString())
+				num, ok := constant.Int64Val(t.Val())
+				if !ok {
+					return "", fmt.Errorf("`%s` is not int", t.Val())
+				}
+				return num, nil
 			}
 			if t.Val().Kind() == constant.Float {
-				return strconv.ParseFloat(t.Val().ExactString(), 64)
+				num, ok := constant.Float64Val(t.Val())
+				if !ok {
+					return "", fmt.Errorf("`%s` is not int", t.Val())
+				}
+				return num, nil
 			}
 			if t.Val().Kind() == constant.Bool {
-				return t.Val().ExactString() == "true", nil
+				return constant.BoolVal(t.Val()), nil
 			}
 			if t.Val().Kind() == constant.Complex {
 				return strconv.ParseComplex(t.Val().ExactString(), 64)
@@ -257,36 +275,36 @@ func (r TypedParam) GetRequired() (*bool, error) {
 	return innerSchema.LookupCast[bool]("Required")
 }
 
-func (r TypedParam) GetMinLen() (*int, error) {
+func (r TypedParam) GetMinLen() (*int64, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
 		return nil, err
 	}
-	return innerSchema.LookupCast[int]("MinLen")
+	return innerSchema.LookupCast[int64]("MinLen")
 }
 
-func (r TypedParam) GetMaxLen() (*int, error) {
+func (r TypedParam) GetMaxLen() (*int64, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
 		return nil, err
 	}
-	return innerSchema.LookupCast[int]("MaxLen")
+	return innerSchema.LookupCast[int64]("MaxLen")
 }
 
-func (r TypedParam) GetMin() (*int, error) {
+func (r TypedParam) GetMin() (*int64, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
 		return nil, err
 	}
-	return innerSchema.LookupCast[int]("Min")
+	return innerSchema.LookupCast[int64]("Min")
 }
 
-func (r TypedParam) GetMax() (*int, error) {
+func (r TypedParam) GetMax() (*int64, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
 		return nil, err
 	}
-	return innerSchema.LookupCast[int]("Max")
+	return innerSchema.LookupCast[int64]("Max")
 }
 
 func (r TypedParam) GetExclusiveMin() (*bool, error) {
@@ -321,20 +339,20 @@ func (r TypedParam) GetPattern() (*string, error) {
 	return innerSchema.LookupCast[string]("Pattern")
 }
 
-func (r TypedParam) GetMinItems() (*int, error) {
+func (r TypedParam) GetMinItems() (*int64, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
 		return nil, err
 	}
-	return innerSchema.LookupCast[int]("MinItems")
+	return innerSchema.LookupCast[int64]("MinItems")
 }
 
-func (r TypedParam) GetMaxItems() (*int, error) {
+func (r TypedParam) GetMaxItems() (*int64, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
 		return nil, err
 	}
-	return innerSchema.LookupCast[int]("MaxItems")
+	return innerSchema.LookupCast[int64]("MaxItems")
 }
 
 func (r TypedParam) GetUniqueItems() (*bool, error) {
@@ -345,20 +363,20 @@ func (r TypedParam) GetUniqueItems() (*bool, error) {
 	return innerSchema.LookupCast[bool]("UniqueItems")
 }
 
-func (r TypedParam) GetMinProperties() (*int, error) {
+func (r TypedParam) GetMinProperties() (*int64, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
 		return nil, err
 	}
-	return innerSchema.LookupCast[int]("MinProperties")
+	return innerSchema.LookupCast[int64]("MinProperties")
 }
 
-func (r TypedParam) GetMaxProperties() (*int, error) {
+func (r TypedParam) GetMaxProperties() (*int64, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
 		return nil, err
 	}
-	return innerSchema.LookupCast[int]("MaxProperties")
+	return innerSchema.LookupCast[int64]("MaxProperties")
 }
 
 func (r TypedParam) GetAdditionalItems() (*bool, error) {

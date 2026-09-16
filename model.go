@@ -2,7 +2,7 @@ package mango
 
 type (
 	Index struct {
-		Order      *int
+		Order      *int64
 		Unique     *bool
 		Sparse     *bool
 		Background *bool
@@ -17,22 +17,22 @@ type (
 		Dependencies map[string][]string    `json:"dependencies,omitempty"`
 		Enum         []any                  `json:"enum,omitempty"`
 
-		MinLen  *int    `json:"minLength,omitempty"`
-		MaxLen  *int    `json:"maxLength,omitempty"`
+		MinLen  *int64  `json:"minLength,omitempty"`
+		MaxLen  *int64  `json:"maxLength,omitempty"`
 		Pattern *string `json:"pattern,omitempty"`
 
-		Min          *int     `json:"minimum,omitempty"`
-		Max          *int     `json:"maximum,omitempty"`
+		Min          *int64   `json:"minimum,omitempty"`
+		Max          *int64   `json:"maximum,omitempty"`
 		ExclusiveMin *bool    `json:"exclusiveMinimum,omitempty"`
 		ExclusiveMax *bool    `json:"exclusiveMaximum,omitempty"`
 		MultipleOf   *float64 `json:"multipleOf,omitempty"`
 
-		MinItems    *int  `json:"minItems,omitempty"`
-		MaxItems    *int  `json:"maxItems,omitempty"`
-		UniqueItems *bool `json:"uniqueItems,omitempty"`
+		MinItems    *int64 `json:"minItems,omitempty"`
+		MaxItems    *int64 `json:"maxItems,omitempty"`
+		UniqueItems *bool  `json:"uniqueItems,omitempty"`
 
-		MaxProperties *int `json:"maxProperties,omitempty"`
-		MinProperties *int `json:"minProperties,omitempty"`
+		MaxProperties *int64 `json:"maxProperties,omitempty"`
+		MinProperties *int64 `json:"minProperties,omitempty"`
 
 		AdditionalItems      *bool `json:"additionalItems,omitempty"`
 		AdditionalProperties *bool `json:"additionalProperties,omitempty"`
