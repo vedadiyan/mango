@@ -1,6 +1,8 @@
 package mango
 
 import (
+	"encoding/json"
+	"fmt"
 	"testing"
 )
 
@@ -16,6 +18,11 @@ func TestRead(t *testing.T) {
 		if err != nil {
 			t.FailNow()
 		}
+		out, err := json.Marshal(value)
+		if err != nil {
+			t.FailNow()
+		}
+		fmt.Println(string(out))
 		_ = value
 	}
 }

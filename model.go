@@ -1,6 +1,12 @@
 package mango
 
 type (
+	Index struct {
+		Order      *int
+		Unique     *bool
+		Sparse     *bool
+		Background *bool
+	}
 	BsonSchema struct {
 		Title        *string                `json:"title,omitempty"`
 		Description  *string                `json:"description,omitempty"`
@@ -34,6 +40,8 @@ type (
 		AnyOf []*BsonSchema `json:"anyOf,omitempty"`
 		OneOf []*BsonSchema `json:"oneOf,omitempty"`
 		AllOf []*BsonSchema `json:"allOf,omitempty"`
+
+		index Index
 	}
 )
 

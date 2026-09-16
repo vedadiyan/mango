@@ -9,6 +9,13 @@ type (
 		void()
 	}
 
+	Index struct {
+		Order      int
+		Unique     bool
+		Sparse     bool
+		Background bool
+	}
+
 	Scalar struct {
 		Title        string
 		Description  string
@@ -23,6 +30,7 @@ type (
 		MaxLen       int
 		Pattern      string
 		Enum         []any
+		Index        Index
 	}
 
 	Composite struct {
@@ -34,6 +42,7 @@ type (
 		MaxProperties        int
 		MinProperties        int
 		AdditionalProperties bool
+		Index                Index
 	}
 
 	Array struct {
@@ -42,6 +51,7 @@ type (
 		MaxItems        int
 		UniqueItems     bool
 		AdditionalItems bool
+		Index           Index
 	}
 
 	OneOf Properties
