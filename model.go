@@ -2,7 +2,7 @@ package mango
 
 type (
 	Index struct {
-		Order      *int64
+		Order      *int
 		Unique     *bool
 		Sparse     *bool
 		Background *bool
