@@ -68,6 +68,7 @@ type (
 		Description  string
 		Properties   Properties
 		Dependencies Dependencies
+		Conditions   Conditions
 	}
 
 	BasicType string
@@ -75,6 +76,9 @@ type (
 	Items        []Type
 	Properties   map[string]Type
 	Dependencies map[string][]string
+
+	Condition  map[string]any
+	Conditions []Condition
 )
 
 const (

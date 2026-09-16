@@ -32,5 +32,10 @@ func Export() static.Schema {
 				},
 			},
 		},
+		Conditions: static.Conditions{
+			{"$exists": static.Condition{
+				"X": 1,
+			}},
+		},
 	}
 }
