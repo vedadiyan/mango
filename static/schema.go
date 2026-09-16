@@ -2,11 +2,7 @@ package static
 
 type (
 	Type interface {
-		void()
-	}
-
-	Property interface {
-		property()
+		typ()
 	}
 
 	Index struct {
@@ -37,7 +33,7 @@ type (
 		Title                string
 		Description          string
 		Required             bool
-		Properties           Specs
+		Properties           Properties
 		Dependencies         Dependencies
 		MaxProperties        int
 		MinProperties        int
@@ -45,8 +41,16 @@ type (
 		Index                Index
 	}
 
+	Combinator[T OneOf | AnyOf | AllOf] struct {
+		Title       string
+		Description string
+		Required    bool
+		Specs       T
+		Index       Index
+	}
+
 	Array struct {
-		Items           Specs
+		Items           Items
 		MinItems        int
 		MaxItems        int
 		UniqueItems     bool
@@ -61,18 +65,14 @@ type (
 	Schema struct {
 		Title        string
 		Description  string
-		Properties   Specs
+		Properties   Properties
 		Dependencies Dependencies
 	}
 
 	BasicType string
 
-	Specs interface {
-		spec()
-	}
-
-	Items        []Property
-	Properties   map[string]Property
+	Items        []Type
+	Properties   map[string]Type
 	Dependencies map[string][]string
 )
 
@@ -95,22 +95,14 @@ func justPanic() {
 	panic("this method should never be called")
 }
 
-func (Scalar) property() {
+func (Scalar) typ() {
 	justPanic()
 }
 
-func (Composite) property() {
+func (Composite) typ() {
 	justPanic()
 }
 
-func (Array) property() {
-	justPanic()
-}
-
-func (Items) spec() {
-	justPanic()
-}
-
-func (Properties) spec() {
+func (Array) typ() {
 	justPanic()
 }
