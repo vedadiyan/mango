@@ -28,13 +28,13 @@ type (
 	}
 	RawSchema  map[string]any
 	Properties map[string]TypedParam
+	Items      []TypedParam
 )
 
 const (
-	ScalarType      = "github.com/vedadiyan/mango/static.Scalar"
-	ObjectType      = "github.com/vedadiyan/mango/static.Composite"
-	ScalarArrayType = "github.com/vedadiyan/mango/static.ScalarArray"
-	ObjectArrayType = "github.com/vedadiyan/mango/static.CompositeArray"
+	ScalarType = "github.com/vedadiyan/mango/static.Scalar"
+	ObjectType = "github.com/vedadiyan/mango/static.Composite"
+	ArrayType  = "github.com/vedadiyan/mango/static.Array"
 )
 
 func Parse(filePath string) (*ParserContext, error) {
@@ -322,6 +322,30 @@ func (r TypedParam) GetPattern() (*string, error) {
 	return innerSchema.LookupCast[string]("Pattern")
 }
 
+func (r TypedParam) GetMinItems() (*int, error) {
+	innerSchema, err := Cast[RawSchema](r.Value)
+	if err != nil {
+		return nil, err
+	}
+	return innerSchema.LookupCast[int]("MinItems")
+}
+
+func (r TypedParam) GetMaxItems() (*int, error) {
+	innerSchema, err := Cast[RawSchema](r.Value)
+	if err != nil {
+		return nil, err
+	}
+	return innerSchema.LookupCast[int]("MaxItems")
+}
+
+func (r TypedParam) GetUniqueItems() (*bool, error) {
+	innerSchema, err := Cast[RawSchema](r.Value)
+	if err != nil {
+		return nil, err
+	}
+	return innerSchema.LookupCast[bool]("UniqueItems")
+}
+
 func (r TypedParam) GetType() ([]string, error) {
 	out := make([]string, 0)
 	switch r.TypeName {
@@ -333,17 +357,9 @@ func (r TypedParam) GetType() ([]string, error) {
 		{
 			return []string{"object"}, nil
 		}
-	case ScalarArrayType:
+	case ArrayType:
 		{
-			out = append(out, "array")
-		}
-	case ObjectArrayType:
-		{
-			return []string{"array", "object"}, nil
-		}
-	default:
-		{
-			return nil, fmt.Errorf("unsupported type %s", r.TypeName)
+			return []string{"array"}, nil
 		}
 	}
 
@@ -355,6 +371,9 @@ func (r TypedParam) GetType() ([]string, error) {
 	innerType, err := innerSchema.LookupCast[TypedParam]("Type")
 	if err != nil {
 		return nil, err
+	}
+	if innerType == nil {
+		return nil, nil
 	}
 
 	types, err := Cast[[]any](innerType.Value)
@@ -372,10 +391,13 @@ func (r TypedParam) GetType() ([]string, error) {
 	return out, nil
 }
 
-func (r RawSchema) GetProperties() (*Properties, error) {
+func (r RawSchema) GetProperties() (Properties, error) {
 	typedParam, err := r.LookupCast[TypedParam]("Properties")
 	if err != nil {
 		return nil, err
+	}
+	if typedParam == nil {
+		return nil, nil
 	}
 	rawSchema, err := Cast[RawSchema](typedParam.Value)
 	if err != nil {
@@ -390,7 +412,34 @@ func (r RawSchema) GetProperties() (*Properties, error) {
 		properties[key] = *typedParam
 	}
 
-	return &properties, nil
+	return properties, nil
+}
+
+func (r RawSchema) GetItems() (Items, error) {
+	typedParam, err := r.LookupCast[TypedParam]("Items")
+	if err != nil {
+		return nil, err
+	}
+	if typedParam == nil {
+		return nil, nil
+	}
+	rawSchema, err := Cast[[]any](typedParam.Value)
+	if err != nil {
+		return nil, err
+	}
+	items := make(Items, 0)
+	for _, value := range *rawSchema {
+		typedParam, err := Cast[TypedParam](value)
+		if err != nil {
+			return nil, err
+		}
+		if typedParam == nil {
+			continue
+		}
+		items = append(items, *typedParam)
+	}
+
+	return items, nil
 }
 
 func Cast[T any](v any) (*T, error) {

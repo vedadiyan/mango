@@ -14,7 +14,7 @@ func GetSchemas(ParserContext *ParserContext) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	out := make([]RawSchema, 0)
+	out := make([]TypedParam, 0)
 	for _, fn := range fns {
 		ident, ok := ParserContext.Info.Defs[fn.Name]
 		if !ok {
@@ -48,7 +48,7 @@ func GetSchemas(ParserContext *ParserContext) (any, error) {
 		if mapperValue.TypeName != schemaType {
 			return nil, fmt.Errorf("expected `%s` but found %s", schemaType, mapperValue.TypeName)
 		}
-		out = append(out, mapperValue.Value.(RawSchema))
+		out = append(out, mapperValue)
 	}
 
 	return out, nil

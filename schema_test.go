@@ -7,18 +7,22 @@ func Export() static.Schema {
 		Title:       "Test Title",
 		Description: "Test Description",
 		Properties: static.Properties{
-			"FirstName": static.ScalarArray{
-				Title:    "Test First Name",
-				Type:     []static.Type{static.TypeString},
-				MinLen:   3,
-				MaxLen:   100,
-				Required: true,
+			"FirstName": static.Array{
+				Items: []static.Type{
+					static.Scalar{
+						Type:   []static.BasicType{static.TypeString},
+						MinLen: 3,
+						MaxLen: 100,
+					},
+				},
 			},
 			"NestObject": static.Composite{
 				Title: "Test Nested Object",
 				Properties: static.Properties{
 					"A": static.Scalar{
-						Type: []static.Type{static.TypeBool},
+						Type: []static.BasicType{static.TypeInt},
+						Min:  10,
+						Max:  10000,
 					},
 				},
 			},

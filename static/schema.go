@@ -12,7 +12,7 @@ type (
 	Scalar struct {
 		Title        string
 		Description  string
-		Type         []Type
+		Type         []BasicType
 		Required     bool
 		Min          int
 		Max          int
@@ -32,11 +32,11 @@ type (
 		Dependencies Dependencies
 	}
 
-	ScalarArray struct {
-		Scalar
-	}
-	CompositeArray struct {
-		Composite
+	Array struct {
+		Items       []Type
+		MinItems    int
+		MaxItems    int
+		UniqueItems bool
 	}
 
 	OneOf Properties
@@ -75,10 +75,6 @@ func justPanic() {
 	panic("this method should never be called")
 }
 
-func (BasicType) void() {
-	justPanic()
-}
-
 func (Scalar) void() {
 	justPanic()
 }
@@ -87,10 +83,6 @@ func (Composite) void() {
 	justPanic()
 }
 
-func (ScalarArray) void() {
-	justPanic()
-}
-
-func (CompositeArray) void() {
+func (Array) void() {
 	justPanic()
 }

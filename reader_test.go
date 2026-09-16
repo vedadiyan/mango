@@ -11,38 +11,11 @@ func TestRead(t *testing.T) {
 		t.FailNow()
 	}
 	schemas, err := GetSchemas(pc)
-	for _, i := range schemas.([]RawSchema) {
-		props, err := i.GetProperties()
+	for _, i := range schemas.([]TypedParam) {
+		value, err := ToBsonSchema(i)
 		if err != nil {
 			t.FailNow()
 		}
-		for _, value := range *props {
-			schema, err := value.GetSchema()
-			if err != nil {
-				t.FailNow()
-			}
-			title, err := schema.GetTitle()
-			if err != nil {
-				t.FailNow()
-			}
-			_ = title
-			typ, err := value.GetType()
-			if err != nil {
-				t.FailNow()
-			}
-			if typ[0] == "object" {
-				xxx, err := schema.GetProperties()
-				if err != nil {
-					t.FailNow()
-				}
-				_ = xxx
-			}
-			_ = typ
-			required, err := value.GetRequired()
-			if err != nil {
-				t.FailNow()
-			}
-			_ = required
-		}
+		_ = value
 	}
 }
