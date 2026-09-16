@@ -41,7 +41,7 @@ type (
 		Index                Index
 	}
 
-	Combinator[T OneOf | AnyOf | AllOf] struct {
+	Combinator[T OneOf | AnyOf | AllOf | Not] struct {
 		Title       string
 		Description string
 		Required    bool
@@ -61,6 +61,7 @@ type (
 	OneOf Items
 	AnyOf Items
 	AllOf Items
+	Not   [1]Type
 
 	Schema struct {
 		Title        string
