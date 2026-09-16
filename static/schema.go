@@ -104,6 +104,10 @@ func (Composite) typ() {
 	justPanic()
 }
 
+func (Combinator[T]) typ() {
+	justPanic()
+}
+
 func (Array) typ() {
 	justPanic()
 }

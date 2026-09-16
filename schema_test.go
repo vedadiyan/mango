@@ -21,7 +21,6 @@ func Export() static.Schema {
 				Title: "Test Nested Object",
 				Properties: static.Properties{
 					"A": static.Scalar{
-						Type:     []static.BasicType{static.TypeInt},
 						Min:      10,
 						Max:      10000,
 						Required: true,
