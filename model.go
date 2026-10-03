@@ -43,10 +43,24 @@ type (
 		Not   *BsonSchema   `json:"Not,omitempty"`
 
 		index Index
+
+		Conditions []map[string]any `json:"-"`
 	}
 )
 
-func ToBsonSchema(in TypedParam) (*BsonSchema, error) {
+func ToBsonSchema(in TypedParam) (any, error) {
+	res, err := toBsonSchema(in)
+	if err != nil {
+		return nil, err
+	}
+	if res.Conditions != nil {
+		return map[string][]any{"$and": {res, res.Conditions}}, nil
+	}
+
+	return res, nil
+}
+
+func toBsonSchema(in TypedParam) (*BsonSchema, error) {
 	out := &BsonSchema{}
 	typeSchema, err := in.GetSchema()
 	if err != nil {
@@ -73,6 +87,10 @@ func ToBsonSchema(in TypedParam) (*BsonSchema, error) {
 		return nil, err
 	}
 	dependencies, err := typeSchema.GetDependencies()
+	if err != nil {
+		return nil, err
+	}
+	conditions, err := typeSchema.GetConditions()
 	if err != nil {
 		return nil, err
 	}
@@ -160,13 +178,14 @@ func ToBsonSchema(in TypedParam) (*BsonSchema, error) {
 	out.MinProperties = minPropertiesValue
 	out.Enum = enum
 	out.Dependencies = dependencies
+	out.Conditions = conditions
 
 	out.Properties = make(map[string]*BsonSchema)
 	switch firstOrDefault(typ) {
 	case "oneof":
 		{
 			for _, item := range specs {
-				bsonSchema, err := ToBsonSchema(item)
+				bsonSchema, err := toBsonSchema(item)
 				if err != nil {
 					return nil, err
 				}
@@ -176,7 +195,7 @@ func ToBsonSchema(in TypedParam) (*BsonSchema, error) {
 	case "anyof":
 		{
 			for _, item := range specs {
-				bsonSchema, err := ToBsonSchema(item)
+				bsonSchema, err := toBsonSchema(item)
 				if err != nil {
 					return nil, err
 				}
@@ -186,7 +205,7 @@ func ToBsonSchema(in TypedParam) (*BsonSchema, error) {
 	case "allof":
 		{
 			for _, item := range specs {
-				bsonSchema, err := ToBsonSchema(item)
+				bsonSchema, err := toBsonSchema(item)
 				if err != nil {
 					return nil, err
 				}
@@ -196,7 +215,7 @@ func ToBsonSchema(in TypedParam) (*BsonSchema, error) {
 	case "not":
 		{
 			for i := 0; i < 1 && i < len(specs); i++ {
-				bsonSchema, err := ToBsonSchema(specs[i])
+				bsonSchema, err := toBsonSchema(specs[i])
 				if err != nil {
 					return nil, err
 				}
@@ -207,7 +226,7 @@ func ToBsonSchema(in TypedParam) (*BsonSchema, error) {
 		{
 			out.Type = typ
 			for key, value := range properties {
-				bsonSchema, err := ToBsonSchema(value)
+				bsonSchema, err := toBsonSchema(value)
 				if err != nil {
 					return nil, err
 				}
@@ -222,7 +241,7 @@ func ToBsonSchema(in TypedParam) (*BsonSchema, error) {
 			}
 
 			for _, item := range items {
-				bsonSchema, err := ToBsonSchema(item)
+				bsonSchema, err := toBsonSchema(item)
 				if err != nil {
 					return nil, err
 				}

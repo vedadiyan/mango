@@ -4,9 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+
+	"github.com/iancoleman/strcase"
 )
 
 func TestRead(t *testing.T) {
+
+	x := strcase.ToSnake("FirstName")
+
+	_ = x
 	pc, err := Parse("./schema_test.go")
 	if err != nil {
 		t.Error(err)

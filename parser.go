@@ -499,6 +499,109 @@ func (r RawSchema) GetProperties() (Properties, error) {
 	return properties, nil
 }
 
+func (r RawSchema) GetConditions() ([]map[string]any, error) {
+	typedParam, err := r.LookupCast[TypedParam]("Conditions")
+	if err != nil {
+		return nil, err
+	}
+	if typedParam == nil {
+		return nil, nil
+	}
+	items, err := CopyCast[[]any](typedParam.Value)
+	if err != nil {
+		return nil, err
+	}
+	return parseCondition(items)
+}
+
+func parseCondition(rawSchema []any) ([]map[string]any, error) {
+	items := make([]map[string]any, 0)
+	for _, value := range rawSchema {
+		typedParam, err := Cast[TypedParam](value)
+		if err != nil {
+			return nil, err
+		}
+		if typedParam == nil {
+			continue
+		}
+		res, err := typedParam.getConditions()
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, res...)
+	}
+
+	return items, nil
+}
+
+func (r RawSchema) getConditions() (map[string]any, error) {
+	items := make(map[string]any, 0)
+	for key, value := range r {
+		switch t := value.(type) {
+		case TypedParam:
+			{
+				res, err := t.getConditions()
+				if err != nil {
+					return nil, err
+				}
+				items[key] = res
+			}
+		case RawSchema:
+			{
+				res, err := t.getConditions()
+				if err != nil {
+					return nil, err
+				}
+				items[key] = res
+			}
+		default:
+			{
+				items[key] = t
+			}
+		}
+	}
+
+	return items, nil
+}
+
+func (r TypedParam) getConditions() ([]map[string]any, error) {
+	switch t := r.Value.(type) {
+	case RawSchema:
+		{
+			res, err := t.getConditions()
+			if err != nil {
+				return nil, err
+			}
+			return []map[string]any{res}, nil
+		}
+	case []any:
+		{
+			items := make([]map[string]any, 0)
+			for _, value := range t {
+				typedParam, err := Cast[TypedParam](value)
+				if err != nil {
+					return nil, err
+				}
+				if typedParam == nil {
+					continue
+				}
+				res, err := typedParam.getConditions()
+				if err != nil {
+					return nil, err
+				}
+				items = append(items, res...)
+			}
+
+			return items, nil
+		}
+	default:
+		{
+			return nil, fmt.Errorf("unexpected case")
+		}
+	}
+
+}
+
 func (r RawSchema) GetItems() (Items, error) {
 	typedParam, err := r.LookupCast[TypedParam]("Items")
 	if err != nil {

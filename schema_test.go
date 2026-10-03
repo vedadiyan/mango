@@ -7,7 +7,7 @@ func Export() static.Schema {
 		Title:       "Test Title",
 		Description: "Test Description",
 		Properties: static.Properties{
-			"FirstName": static.Array{
+			"first_name": static.Array{
 				Items: static.Items{
 					static.Scalar{
 						Type:     []static.BasicType{static.TypeString},
@@ -17,7 +17,7 @@ func Export() static.Schema {
 					},
 				},
 			},
-			"NestObject": static.Composite{
+			"nested_object": static.Composite{
 				Title: "Test Nested Object",
 				Properties: static.Properties{
 					"A": static.Scalar{
@@ -34,7 +34,15 @@ func Export() static.Schema {
 		},
 		Conditions: static.Conditions{
 			{"$exists": static.Condition{
-				"X": 1,
+				"X": static.Condition{
+					"Y": static.Conditions{
+						{
+							"Z": static.Condition{
+								"V": 1,
+							},
+						},
+					},
+				},
 			}},
 		},
 	}
