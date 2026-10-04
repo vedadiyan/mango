@@ -2,7 +2,7 @@ package mango
 
 import "github.com/vedadiyan/mango/static"
 
-func Export() static.Schema {
+func DefineExport() static.Schema {
 	return static.Schema{
 		Title:       "Test Title",
 		Description: "Test Description",

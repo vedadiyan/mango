@@ -18,8 +18,8 @@ func TestRead(t *testing.T) {
 		t.FailNow()
 	}
 	schemas, err := GetSchemas(pc)
-	for _, i := range schemas.([]TypedParam) {
-		value, err := GetGoTypes(i, []string{"Root"})
+	for _, i := range schemas {
+		value, err := GetGoTypes(i.TypedParam, []string{i.Name})
 		if err != nil {
 			t.FailNow()
 		}

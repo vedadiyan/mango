@@ -3,18 +3,28 @@ package mango
 import (
 	"fmt"
 	"go/ast"
+	"go/token"
+	"strings"
 )
 
 const (
 	schemaType = "github.com/vedadiyan/mango/static.Schema"
 )
 
-func GetSchemas(ParserContext *ParserContext) (any, error) {
+type (
+	Schema struct {
+		Package    string
+		Name       string
+		TypedParam TypedParam
+	}
+)
+
+func GetSchemas(ParserContext *ParserContext) ([]Schema, error) {
 	fns, err := ParserContext.ExtractFuncs()
 	if err != nil {
 		return nil, err
 	}
-	out := make([]TypedParam, 0)
+	out := make([]Schema, 0)
 	for _, fn := range fns {
 		ident, ok := ParserContext.Info.Defs[fn.Name]
 		if !ok {
@@ -24,7 +34,7 @@ func GetSchemas(ParserContext *ParserContext) (any, error) {
 			continue
 		}
 		res := fn.Type.Results
-		if res.NumFields() != 1 {
+		if res.NumFields() == 0 || res.NumFields() > 2 {
 			continue
 		}
 
@@ -33,7 +43,23 @@ func GetSchemas(ParserContext *ParserContext) (any, error) {
 		if !ok {
 			continue
 		}
-		compositLit, ok := returnStatement.Results[0].(*ast.CompositeLit)
+
+		definition := returnStatement.Results[0]
+		name := strings.TrimPrefix(fn.Name.String(), "Define")
+
+		if len(returnStatement.Results) == 2 {
+			val, ok := returnStatement.Results[0].(*ast.BasicLit)
+			if !ok {
+				return nil, fmt.Errorf("expected `BasicLit` but found `%T`", returnStatement.Results[0])
+			}
+			if val.Kind != token.STRING {
+				return nil, fmt.Errorf("expected `string` but found `%s`", val.Kind)
+			}
+			name = val.Value
+			definition = returnStatement.Results[1]
+		}
+
+		compositLit, ok := definition.(*ast.CompositeLit)
 		if !ok {
 			continue
 		}
@@ -48,7 +74,7 @@ func GetSchemas(ParserContext *ParserContext) (any, error) {
 		if mapperValue.TypeName != schemaType {
 			return nil, fmt.Errorf("expected `%s` but found %s", schemaType, mapperValue.TypeName)
 		}
-		out = append(out, mapperValue)
+		out = append(out, Schema{ident.Pkg().Name(), name, mapperValue})
 	}
 
 	return out, nil
