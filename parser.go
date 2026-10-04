@@ -414,6 +414,58 @@ func (r TypedParam) GetEnum() ([]any, error) {
 	return *enum, nil
 }
 
+func (r TypedParam) IsCombinator() bool {
+	switch r.TypeName {
+	case OneOf, AnyOf, AllOf, Not:
+		{
+			return true
+		}
+	default:
+		{
+			return false
+		}
+	}
+}
+
+func (r TypedParam) IsArray() bool {
+	switch r.TypeName {
+	case ArrayType:
+		{
+			return true
+		}
+	default:
+		{
+			return false
+		}
+	}
+}
+
+func (r TypedParam) IsScalar() bool {
+	switch r.TypeName {
+	case ArrayType, ObjectType, OneOf, AnyOf, AllOf, Not:
+		{
+			return false
+		}
+	default:
+		{
+			return false
+		}
+	}
+}
+
+func (r TypedParam) IsObject() bool {
+	switch r.TypeName {
+	case ObjectType:
+		{
+			return true
+		}
+	default:
+		{
+			return false
+		}
+	}
+}
+
 func (r TypedParam) GetType() ([]string, error) {
 	out := make([]string, 0)
 	switch r.TypeName {

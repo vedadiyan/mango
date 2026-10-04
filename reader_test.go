@@ -1,7 +1,6 @@
 package mango
 
 import (
-	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -20,15 +19,11 @@ func TestRead(t *testing.T) {
 	}
 	schemas, err := GetSchemas(pc)
 	for _, i := range schemas.([]TypedParam) {
-		value, err := ToBsonSchema(i)
+		value, err := GetGoTypes(i, []string{"Root"})
 		if err != nil {
 			t.FailNow()
 		}
-		out, err := json.MarshalIndent(value, "", "\t")
-		if err != nil {
-			t.FailNow()
-		}
-		fmt.Println(string(out))
+		fmt.Printf("%v", value)
 		_ = value
 	}
 }

@@ -1,5 +1,7 @@
 package mango
 
+import "encoding/json"
+
 type (
 	Index struct {
 		Order      *int
@@ -48,19 +50,22 @@ type (
 	}
 )
 
-func ToBsonSchema(in TypedParam) (any, error) {
-	res, err := toBsonSchema(in)
-	if err != nil {
-		return nil, err
-	}
-	if res.Conditions != nil {
-		return map[string][]any{"$and": {res, res.Conditions}}, nil
+func ToMongoValidationSchema(in *BsonSchema) (string, error) {
+	val := any(in)
+
+	if in.Conditions != nil {
+		val = map[string][]any{"$and": {in, in.Conditions}}
 	}
 
-	return res, nil
+	out, err := json.MarshalIndent(val, "", "\t")
+	if err != nil {
+		return "", err
+	}
+
+	return string(out), nil
 }
 
-func toBsonSchema(in TypedParam) (*BsonSchema, error) {
+func ToBsonSchema(in TypedParam) (*BsonSchema, error) {
 	out := &BsonSchema{}
 	typeSchema, err := in.GetSchema()
 	if err != nil {
@@ -185,7 +190,7 @@ func toBsonSchema(in TypedParam) (*BsonSchema, error) {
 	case "oneof":
 		{
 			for _, item := range specs {
-				bsonSchema, err := toBsonSchema(item)
+				bsonSchema, err := ToBsonSchema(item)
 				if err != nil {
 					return nil, err
 				}
@@ -195,7 +200,7 @@ func toBsonSchema(in TypedParam) (*BsonSchema, error) {
 	case "anyof":
 		{
 			for _, item := range specs {
-				bsonSchema, err := toBsonSchema(item)
+				bsonSchema, err := ToBsonSchema(item)
 				if err != nil {
 					return nil, err
 				}
@@ -205,7 +210,7 @@ func toBsonSchema(in TypedParam) (*BsonSchema, error) {
 	case "allof":
 		{
 			for _, item := range specs {
-				bsonSchema, err := toBsonSchema(item)
+				bsonSchema, err := ToBsonSchema(item)
 				if err != nil {
 					return nil, err
 				}
@@ -215,7 +220,7 @@ func toBsonSchema(in TypedParam) (*BsonSchema, error) {
 	case "not":
 		{
 			for i := 0; i < 1 && i < len(specs); i++ {
-				bsonSchema, err := toBsonSchema(specs[i])
+				bsonSchema, err := ToBsonSchema(specs[i])
 				if err != nil {
 					return nil, err
 				}
@@ -226,7 +231,7 @@ func toBsonSchema(in TypedParam) (*BsonSchema, error) {
 		{
 			out.Type = typ
 			for key, value := range properties {
-				bsonSchema, err := toBsonSchema(value)
+				bsonSchema, err := ToBsonSchema(value)
 				if err != nil {
 					return nil, err
 				}
@@ -241,7 +246,7 @@ func toBsonSchema(in TypedParam) (*BsonSchema, error) {
 			}
 
 			for _, item := range items {
-				bsonSchema, err := toBsonSchema(item)
+				bsonSchema, err := ToBsonSchema(item)
 				if err != nil {
 					return nil, err
 				}

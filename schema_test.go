@@ -17,6 +17,17 @@ func Export() static.Schema {
 					},
 				},
 			},
+			"last_name": static.Array{
+				Items: static.Items{
+					static.Composite{
+						Properties: static.Properties{
+							"title": static.Scalar{
+								Type: []static.BasicType{static.TypeString},
+							},
+						},
+					},
+				},
+			},
 			"nested_object": static.Composite{
 				Title: "Test Nested Object",
 				Properties: static.Properties{
@@ -25,6 +36,19 @@ func Export() static.Schema {
 						Min:      10,
 						Max:      10000,
 						Required: true,
+					},
+					"C": static.Scalar{
+						Type:     []static.BasicType{static.TypeInt},
+						Min:      10,
+						Max:      10000,
+						Required: true,
+					},
+					"B": static.Composite{
+						Properties: static.Properties{
+							"Z": static.Scalar{
+								Type: []static.BasicType{static.TypeBool},
+							},
+						},
 					},
 				},
 				Dependencies: static.Dependencies{
