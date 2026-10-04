@@ -448,7 +448,7 @@ func (r TypedParam) IsScalar() bool {
 		}
 	default:
 		{
-			return false
+			return true
 		}
 	}
 }

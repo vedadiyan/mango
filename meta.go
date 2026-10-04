@@ -40,37 +40,30 @@ func GetGoTypes(in TypedParam, parents []string) (Types, error) {
 	}
 
 	for key, value := range properties {
-		switch value.TypeName {
-		case ObjectType:
-			{
-				res, err := GetGoTypes(value, append(parents, key))
-				if err != nil {
-					return nil, err
-				}
-				copyGoTypes(out, res)
+		if value.IsArray() {
+			res, err := GetGoArrayType(key, value, parents)
+			if err != nil {
+				return nil, err
 			}
-		case ArrayType:
-			{
-				res, err := GetGoArrayType(key, value, parents)
-				if err != nil {
-					return nil, err
-				}
-				copyGoTypes(out, res)
-			}
-		default:
-			{
-				typ, err := value.GetType()
-				if err != nil {
-					return nil, err
-				}
-				finalType, err := GetGoType(typ, key)
-				if err != nil {
-					return nil, err
-				}
-				out[current][key] = finalType
-			}
+			copyGoTypes(out, res)
+			continue
 		}
-
+		if value.IsObject() {
+			res, err := GetGoTypes(value, append(parents, key))
+			if err != nil {
+				return nil, err
+			}
+			copyGoTypes(out, res)
+		}
+		typ, err := value.GetType()
+		if err != nil {
+			return nil, err
+		}
+		goType, err := GetGoType(typ, key)
+		if err != nil {
+			return nil, err
+		}
+		out[current][key] = goType
 	}
 
 	return out, nil
@@ -101,7 +94,6 @@ func GetGoArrayType(key string, value TypedParam, parents []string) (Types, erro
 			return nil, err
 		}
 		copyGoTypes(out, res)
-		return out, nil
 	}
 
 	typ, err := items[0].GetType()
