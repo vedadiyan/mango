@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"maps"
 	"strings"
+
+	"github.com/iancoleman/strcase"
 )
 
 type (
@@ -40,6 +42,7 @@ func GetGoTypes(in TypedParam, parents []string) (Types, error) {
 	}
 
 	for key, value := range properties {
+		key = MakePascalCase(key)
 		if value.IsArray() {
 			res, err := GetGoArrayType(key, value, parents)
 			if err != nil {
@@ -155,4 +158,8 @@ func lastOrDefault[T any](in []T) T {
 		return zero
 	}
 	return in[len(in)-1]
+}
+
+func MakePascalCase(str string) string {
+	return strcase.ToCamel(str)
 }
