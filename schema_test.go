@@ -7,52 +7,49 @@ func DefineExport() static.Schema {
 		Title:       "Test Title",
 		Description: "Test Description",
 		Properties: static.Properties{
-			"first_name": static.Array{
-				Items: static.Items{
-					static.Scalar{
-						Type:     []static.BasicType{static.TypeString},
-						MinLen:   3,
-						MaxLen:   100,
-						Required: true,
-					},
-				},
+			"first_name": static.Scalar{
+				Type: []static.BasicType{static.TypeString},
 			},
-			"last_name": static.Array{
+			"last_name": static.Scalar{
+				Type: []static.BasicType{static.TypeString},
+			},
+			"products": static.Array{
 				Items: static.Items{
 					static.Composite{
 						Properties: static.Properties{
-							"title": static.Scalar{
+							"id": static.Scalar{
+								Type: []static.BasicType{static.TypeInt},
+							},
+							"name": static.Scalar{
 								Type: []static.BasicType{static.TypeString},
 							},
 						},
 					},
 				},
 			},
-			"nested_object": static.Composite{
-				Title: "Test Nested Object",
+			"address": static.Composite{
 				Properties: static.Properties{
-					"A": static.Scalar{
-						Type:     []static.BasicType{static.TypeInt},
-						Min:      10,
-						Max:      10000,
-						Required: true,
+					"postal_code": static.Scalar{
+						Type: []static.BasicType{static.TypeString},
 					},
-					"C": static.Scalar{
-						Type:     []static.BasicType{static.TypeInt},
-						Min:      10,
-						Max:      10000,
-						Required: true,
+					"street": static.Scalar{
+						Type: []static.BasicType{static.TypeString},
 					},
-					"B": static.Composite{
-						Properties: static.Properties{
-							"Z": static.Scalar{
-								Type: []static.BasicType{static.TypeBool},
+				},
+			},
+			"nd_array": static.Array{
+				Items: static.Items{
+					static.Array{
+						Items: static.Items{
+							static.Array{
+								Items: static.Items{
+									static.Scalar{
+										Type: []static.BasicType{static.TypeInt},
+									},
+								},
 							},
 						},
 					},
-				},
-				Dependencies: static.Dependencies{
-					"A": {"email"},
 				},
 			},
 		},
