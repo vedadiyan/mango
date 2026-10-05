@@ -1,4 +1,4 @@
-package models
+package generators
 
 import (
 	"bytes"
