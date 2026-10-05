@@ -45,18 +45,44 @@ func (x *AutoInlinerCodec[T]) Decode(value []byte) (*T, error) {
 }
 
 func AutoInliner(src reflect.Type) reflect.Type {
-	if src.Kind() == reflect.Slice {
-		return reflect.SliceOf(AutoInliner(src.Elem()))
-	}
+	indirectType, n := Indirect(src)
 
-	if src.Kind() == reflect.Array {
-		return reflect.ArrayOf(src.Len(), AutoInliner(src.Elem()))
+	switch indirectType.Kind() {
+	case reflect.Slice:
+		{
+			out := reflect.SliceOf(AutoInliner(indirectType.Elem()))
+			if n == 0 {
+				return out
+			}
+			return PointerTo(out, n)
+		}
+	case reflect.Array:
+		{
+			out := reflect.ArrayOf(indirectType.Len(), AutoInliner(indirectType.Elem()))
+			if n == 0 {
+				return out
+			}
+			return PointerTo(out, n)
+		}
+	case reflect.Struct:
+		{
+			out := RewriteStruct(indirectType)
+			if n == 0 {
+				return out
+			}
+			return PointerTo(out, n)
+		}
+	default:
+		{
+			if n == 0 {
+				return indirectType
+			}
+			return PointerTo(indirectType, n)
+		}
 	}
+}
 
-	if src.Kind() != reflect.Struct {
-		return src
-	}
-
+func RewriteStruct(src reflect.Type) reflect.Type {
 	out := make([]reflect.StructField, 0)
 	for field := range src.Fields() {
 		if !field.Anonymous {
@@ -101,14 +127,37 @@ func AutoInliner(src reflect.Type) reflect.Type {
 	return reflect.StructOf(out)
 }
 
-func IsMetadata(field reflect.Type) (reflect.StructTag, bool) {
-	if f := field.Kind(); f == reflect.Slice || f == reflect.Array {
-		return IsMetadata(field.Elem())
+func Indirect(src reflect.Type) (reflect.Type, int) {
+	current := src
+	n := 0
+	if src.Kind() == reflect.Pointer {
+		for current.Kind() == reflect.Pointer {
+			current = current.Elem()
+			n++
+		}
 	}
-	if field.Kind() != reflect.Struct {
+	return current, n
+}
+
+func PointerTo(src reflect.Type, n int) reflect.Type {
+	typ := src
+	for range n {
+		typ = reflect.PointerTo(typ)
+	}
+	return typ
+}
+
+func IsMetadata(src reflect.Type) (reflect.StructTag, bool) {
+	if src.Kind() == reflect.Pointer {
+		return IsMetadata(src.Elem())
+	}
+	if f := src.Kind(); f == reflect.Slice || f == reflect.Array {
+		return IsMetadata(src.Elem())
+	}
+	if src.Kind() != reflect.Struct {
 		return "", false
 	}
-	for f := range field.Fields() {
+	for f := range src.Fields() {
 		if f.Anonymous && f.Type.AssignableTo(metadataType) {
 			for innerField := range f.Type.Fields() {
 				if innerField.Type.Implements(metadataType) {

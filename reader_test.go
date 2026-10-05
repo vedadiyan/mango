@@ -30,14 +30,13 @@ func TestRead(t *testing.T) {
 
 	t1 := AutoInliner(reflect.TypeFor[X]())
 	test := X{}
-	test.Fields = append(test.Fields, struct {
+	test.Fields = &struct {
 		FieldsMetadata
 		Y
 		Z
-	}{
-		Name:     "Pouya",
-		Username: "Vpouya",
-	})
+	}{}
+	test.Fields.Name = "Pouya"
+	test.Fields.Username = "VPouya"
 
 	vallll := Convert(&test, t1).Interface()
 
@@ -67,7 +66,7 @@ type FieldsMetadata struct {
 }
 
 type X struct {
-	Fields []struct {
+	Fields *struct {
 		FieldsMetadata
 		Y
 		Z
