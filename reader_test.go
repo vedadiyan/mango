@@ -44,6 +44,7 @@ func TestRead(t *testing.T) {
 	xxxxx, err := codec.Decode(outtt)
 
 	_ = xxxxx
+	fmt.Println()
 	fmt.Println(string(outtt))
 }
 
@@ -55,15 +56,11 @@ type Z struct {
 	Username string `bson:"Username"`
 }
 
-type Metadata interface {
-	getMetadata(Metadata)
-}
-
 type FieldsMetadata struct {
-	_x bool `Values`
+	_x bool `bson:"Values"`
 }
 
-func (x *FieldsMetadata) getMetadata(Metadata) {}
+func (x FieldsMetadata) getMetadata(Metadata) {}
 
 type X struct {
 	Fields struct {

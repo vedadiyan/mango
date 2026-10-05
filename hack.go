@@ -14,6 +14,14 @@ type (
 	}
 )
 
+var (
+	metadataType = reflect.TypeFor[Metadata]()
+)
+
+type Metadata interface {
+	getMetadata(Metadata)
+}
+
 func NewAutoInlinerCodec[T any]() *AutoInlinerCodec[T] {
 	srcType := reflect.TypeFor[T]()
 	dynamicType := AutoInliner(srcType)
@@ -45,6 +53,15 @@ func AutoInliner(src reflect.Type) reflect.Type {
 	out := make([]reflect.StructField, 0)
 	for field := range src.Fields() {
 		if !field.Anonymous {
+			tag := field.Tag
+			if field.Type.Implements(metadataType) {
+				for f := range field.Type.Fields() {
+					if f.Type.Implements(metadataType) {
+						tag = f.Type.Field(0).Tag
+						break
+					}
+				}
+			}
 			out = append(out, reflect.StructField{
 				Name:      field.Name,
 				Anonymous: false,
@@ -52,7 +69,19 @@ func AutoInliner(src reflect.Type) reflect.Type {
 				Offset:    field.Offset,
 				PkgPath:   field.PkgPath,
 				Type:      AutoInliner(field.Type),
-				Tag:       field.Tag,
+				Tag:       tag,
+			})
+			continue
+		}
+		if field.Type.Implements(metadataType) {
+			out = append(out, reflect.StructField{
+				Name:      field.Name,
+				Anonymous: false,
+				Index:     field.Index,
+				Offset:    field.Offset,
+				PkgPath:   field.PkgPath,
+				Type:      AutoInliner(field.Type),
+				Tag:       reflect.StructTag(`bson:"-"`),
 			})
 			continue
 		}
