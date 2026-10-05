@@ -34,7 +34,6 @@ func RegisterCodec[T any](registry *bson.Registry) error {
 		return err
 	}
 
-	_ = decoder
 	registry.RegisterTypeEncoder(alc.srcType, bson.ValueEncoderFunc(func(ec bson.EncodeContext, vw bson.ValueWriter, v reflect.Value) error {
 		val := reflect.New(alc.srcType)
 		val.Elem().Set(v)
