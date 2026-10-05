@@ -41,8 +41,8 @@ func (x *AutoInlinerCodec[T]) Decode(value []byte) (*T, error) {
 	if err := bson.UnmarshalExtJSON(value, true, v); err != nil {
 		return nil, err
 	}
-	out := Convert(v, x.srcType).Interface().(T)
-	return &out, nil
+	out := Convert(v, x.srcType).Interface()
+	return out.(*T), nil
 }
 
 func AutoInliner(src reflect.Type) reflect.Type {
@@ -100,8 +100,5 @@ func AutoInliner(src reflect.Type) reflect.Type {
 }
 
 func Convert(v any, typ reflect.Type) reflect.Value {
-	src := reflect.ValueOf(v)
-
-	ptr := unsafe.Pointer(src.Pointer())
-	return reflect.NewAt(typ, ptr).Elem()
+	return reflect.NewAt(typ, unsafe.Pointer(reflect.ValueOf(v).Pointer()))
 }
