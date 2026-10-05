@@ -34,28 +34,32 @@ func RegisterCodec[T any](registry *bson.Registry) error {
 		return err
 	}
 
-	registry.RegisterTypeEncoder(alc.srcType, bson.ValueEncoderFunc(func(ec bson.EncodeContext, vw bson.ValueWriter, v reflect.Value) error {
-		val := reflect.New(alc.srcType)
-		val.Elem().Set(v)
-		out, err := alc.EncodeValue(val)
-		if err != nil {
-			return err
-		}
-		return encoder.EncodeValue(ec, vw, reflect.ValueOf(bson.Raw(out)))
-	}))
+	registry.RegisterTypeEncoder(alc.srcType, bson.ValueEncoderFunc(
+		func(ec bson.EncodeContext, vw bson.ValueWriter, v reflect.Value) error {
+			val := reflect.New(alc.srcType)
+			val.Elem().Set(v)
+			out, err := alc.EncodeValue(val)
+			if err != nil {
+				return err
+			}
+			return encoder.EncodeValue(ec, vw, reflect.ValueOf(bson.Raw(out)))
+		},
+	))
 
-	registry.RegisterTypeDecoder(alc.srcType, bson.ValueDecoderFunc(func(dc bson.DecodeContext, vr bson.ValueReader, v reflect.Value) error {
-		raw := bson.Raw{}
-		if err := decoder.DecodeValue(dc, vr, reflect.ValueOf(&raw).Elem()); err != nil {
-			return err
-		}
-		out, err := alc.DecodeValue(raw)
-		if err != nil {
-			return err
-		}
-		v.Set(out.Elem())
-		return nil
-	}))
+	registry.RegisterTypeDecoder(alc.srcType, bson.ValueDecoderFunc(
+		func(dc bson.DecodeContext, vr bson.ValueReader, v reflect.Value) error {
+			raw := bson.Raw{}
+			if err := decoder.DecodeValue(dc, vr, reflect.ValueOf(&raw).Elem()); err != nil {
+				return err
+			}
+			out, err := alc.DecodeValue(raw)
+			if err != nil {
+				return err
+			}
+			v.Set(out.Elem())
+			return nil
+		},
+	))
 
 	return nil
 }
