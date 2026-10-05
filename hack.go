@@ -12,15 +12,14 @@ type (
 		srcType     reflect.Type
 		dynamicType reflect.Type
 	}
+	Metadata interface {
+		dummyMethod(Metadata)
+	}
 )
 
 var (
 	metadataType = reflect.TypeFor[Metadata]()
 )
-
-type Metadata interface {
-	getMetadata(Metadata)
-}
 
 func NewAutoInlinerCodec[T any]() *AutoInlinerCodec[T] {
 	srcType := reflect.TypeFor[T]()
@@ -62,13 +61,8 @@ func AutoInliner(src reflect.Type) reflect.Type {
 	for field := range src.Fields() {
 		if !field.Anonymous {
 			tag := field.Tag
-			if field.Type.Implements(metadataType) {
-				for f := range field.Type.Fields() {
-					if f.Type.Implements(metadataType) {
-						tag = f.Type.Field(0).Tag
-						break
-					}
-				}
+			if tagValue, ok := IsMetadata(field.Type); ok {
+				tag = tagValue
 			}
 			out = append(out, reflect.StructField{
 				Name:      field.Name,
@@ -105,6 +99,25 @@ func AutoInliner(src reflect.Type) reflect.Type {
 
 	}
 	return reflect.StructOf(out)
+}
+
+func IsMetadata(field reflect.Type) (reflect.StructTag, bool) {
+	if f := field.Kind(); f == reflect.Slice || f == reflect.Array {
+		return IsMetadata(field.Elem())
+	}
+	if field.Kind() != reflect.Struct {
+		return "", false
+	}
+	for f := range field.Fields() {
+		if f.Anonymous && f.Type.AssignableTo(metadataType) {
+			for innerField := range f.Type.Fields() {
+				if innerField.Type.Implements(metadataType) {
+					return innerField.Tag, true
+				}
+			}
+		}
+	}
+	return "", false
 }
 
 func Convert(v any, typ reflect.Type) reflect.Value {

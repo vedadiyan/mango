@@ -63,10 +63,8 @@ type Z struct {
 }
 
 type FieldsMetadata struct {
-	_x bool `bson:"Values"`
+	Metadata `bson:"Values"`
 }
-
-func (x FieldsMetadata) getMetadata(Metadata) {}
 
 type X struct {
 	Fields []struct {
