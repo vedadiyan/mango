@@ -2,7 +2,6 @@ package mango
 
 import (
 	"reflect"
-	"unsafe"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -12,6 +11,7 @@ type (
 		srcType     reflect.Type
 		dynamicType reflect.Type
 	}
+
 	Metadata interface {
 		dummyMethod(Metadata)
 	}
@@ -20,6 +20,46 @@ type (
 var (
 	metadataType = reflect.TypeFor[Metadata]()
 )
+
+func RegisterCodec[T any](registry *bson.Registry) error {
+	alc := NewAutoInlinerCodec[T]()
+
+	encoder, err := registry.LookupEncoder(reflect.TypeFor[bson.Raw]())
+	if err != nil {
+		return err
+	}
+
+	decoder, err := registry.LookupDecoder(reflect.TypeFor[bson.Raw]())
+	if err != nil {
+		return err
+	}
+
+	_ = decoder
+	registry.RegisterTypeEncoder(alc.srcType, bson.ValueEncoderFunc(func(ec bson.EncodeContext, vw bson.ValueWriter, v reflect.Value) error {
+		val := reflect.New(alc.srcType)
+		val.Elem().Set(v)
+		out, err := alc.EncodeValue(val)
+		if err != nil {
+			return err
+		}
+		return encoder.EncodeValue(ec, vw, reflect.ValueOf(bson.Raw(out)))
+	}))
+
+	registry.RegisterTypeDecoder(alc.srcType, bson.ValueDecoderFunc(func(dc bson.DecodeContext, vr bson.ValueReader, v reflect.Value) error {
+		raw := bson.Raw{}
+		if err := decoder.DecodeValue(dc, vr, reflect.ValueOf(&raw).Elem()); err != nil {
+			return err
+		}
+		out, err := alc.DecodeValue(raw)
+		if err != nil {
+			return err
+		}
+		v.Set(out.Elem())
+		return nil
+	}))
+
+	return nil
+}
 
 func NewAutoInlinerCodec[T any]() *AutoInlinerCodec[T] {
 	srcType := reflect.TypeFor[T]()
@@ -32,16 +72,30 @@ func NewAutoInlinerCodec[T any]() *AutoInlinerCodec[T] {
 
 func (x *AutoInlinerCodec[T]) Encode(value *T) ([]byte, error) {
 	out := Convert(value, x.dynamicType)
-	return bson.MarshalExtJSON(out.Interface(), true, true)
+	return bson.Marshal(out.Interface())
+}
+
+func (x *AutoInlinerCodec[T]) EncodeValue(v reflect.Value) ([]byte, error) {
+	out := ConvertValue(v, x.dynamicType)
+	return bson.Marshal(out.Interface())
 }
 
 func (x *AutoInlinerCodec[T]) Decode(value []byte) (*T, error) {
 	v := reflect.New(x.dynamicType).Interface()
-	if err := bson.UnmarshalExtJSON(value, true, v); err != nil {
+	if err := bson.Unmarshal(value, v); err != nil {
 		return nil, err
 	}
 	out := Convert(v, x.srcType).Interface()
 	return out.(*T), nil
+}
+
+func (x *AutoInlinerCodec[T]) DecodeValue(value []byte) (reflect.Value, error) {
+	v := reflect.New(x.dynamicType).Interface()
+	if err := bson.Unmarshal(value, v); err != nil {
+		return reflect.Value{}, err
+	}
+	out := Convert(v, x.srcType)
+	return out, nil
 }
 
 func AutoInliner(src reflect.Type) reflect.Type {
@@ -170,5 +224,9 @@ func IsMetadata(src reflect.Type) (reflect.StructTag, bool) {
 }
 
 func Convert(v any, typ reflect.Type) reflect.Value {
-	return reflect.NewAt(typ, unsafe.Pointer(reflect.ValueOf(v).Pointer()))
+	return reflect.NewAt(typ, reflect.ValueOf(v).UnsafePointer())
+}
+
+func ConvertValue(v reflect.Value, typ reflect.Type) reflect.Value {
+	return reflect.NewAt(typ, v.UnsafePointer())
 }
