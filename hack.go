@@ -139,25 +139,33 @@ func PointerTo(src reflect.Type, n int) reflect.Type {
 }
 
 func IsMetadata(src reflect.Type) (reflect.StructTag, bool) {
-	if src.Kind() == reflect.Pointer {
-		return IsMetadata(src.Elem())
-	}
-	if f := src.Kind(); f == reflect.Slice || f == reflect.Array {
-		return IsMetadata(src.Elem())
-	}
-	if src.Kind() != reflect.Struct {
-		return "", false
-	}
-	for f := range src.Fields() {
-		if f.Anonymous && f.Type.AssignableTo(metadataType) {
-			for innerField := range f.Type.Fields() {
-				if innerField.Type.Implements(metadataType) {
-					return innerField.Tag, true
+	switch src.Kind() {
+	case reflect.Pointer:
+		{
+			return IsMetadata(src.Elem())
+		}
+	case reflect.Slice, reflect.Array:
+		{
+			return IsMetadata(src.Elem())
+		}
+	case reflect.Struct:
+		{
+			for f := range src.Fields() {
+				if f.Anonymous && f.Type.AssignableTo(metadataType) {
+					for innerField := range f.Type.Fields() {
+						if innerField.Type.Implements(metadataType) {
+							return innerField.Tag, true
+						}
+					}
 				}
 			}
+			return "", false
+		}
+	default:
+		{
+			return "", false
 		}
 	}
-	return "", false
 }
 
 func Convert(v any, typ reflect.Type) reflect.Value {
