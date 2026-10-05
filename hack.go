@@ -46,40 +46,31 @@ func (x *AutoInlinerCodec[T]) Decode(value []byte) (*T, error) {
 
 func AutoInliner(src reflect.Type) reflect.Type {
 	indirectType, n := Indirect(src)
+	var out reflect.Type
 
 	switch indirectType.Kind() {
 	case reflect.Slice:
 		{
-			out := reflect.SliceOf(AutoInliner(indirectType.Elem()))
-			if n == 0 {
-				return out
-			}
-			return PointerTo(out, n)
+			out = reflect.SliceOf(AutoInliner(indirectType.Elem()))
 		}
 	case reflect.Array:
 		{
-			out := reflect.ArrayOf(indirectType.Len(), AutoInliner(indirectType.Elem()))
-			if n == 0 {
-				return out
-			}
-			return PointerTo(out, n)
+			out = reflect.ArrayOf(indirectType.Len(), AutoInliner(indirectType.Elem()))
 		}
 	case reflect.Struct:
 		{
-			out := RewriteStruct(indirectType)
-			if n == 0 {
-				return out
-			}
-			return PointerTo(out, n)
+			out = RewriteStruct(indirectType)
 		}
 	default:
 		{
-			if n == 0 {
-				return indirectType
-			}
-			return PointerTo(indirectType, n)
+			out = indirectType
 		}
 	}
+
+	if n == 0 {
+		return out
+	}
+	return PointerTo(out, n)
 }
 
 func RewriteStruct(src reflect.Type) reflect.Type {
