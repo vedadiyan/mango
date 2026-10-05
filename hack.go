@@ -46,6 +46,14 @@ func (x *AutoInlinerCodec[T]) Decode(value []byte) (*T, error) {
 }
 
 func AutoInliner(src reflect.Type) reflect.Type {
+	if src.Kind() == reflect.Slice {
+		return reflect.SliceOf(AutoInliner(src.Elem()))
+	}
+
+	if src.Kind() == reflect.Array {
+		return reflect.ArrayOf(src.Len(), AutoInliner(src.Elem()))
+	}
+
 	if src.Kind() != reflect.Struct {
 		return src
 	}
