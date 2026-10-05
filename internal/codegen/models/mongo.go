@@ -1,6 +1,10 @@
-package mango
+package models
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/vedadiyan/mango/internal/codegen"
+)
 
 type (
 	Index struct {
@@ -65,7 +69,7 @@ func ToMongoValidationSchema(in *BsonSchema) (string, error) {
 	return string(out), nil
 }
 
-func ToBsonSchema(in TypedParam) (*BsonSchema, error) {
+func ToBsonSchema(in codegen.TypedParam) (*BsonSchema, error) {
 	out := &BsonSchema{}
 	typeSchema, err := in.GetSchema()
 	if err != nil {

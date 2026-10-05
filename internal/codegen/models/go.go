@@ -1,4 +1,4 @@
-package mango
+package models
 
 import (
 	"bytes"
@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/iancoleman/strcase"
+	"github.com/vedadiyan/mango/internal/codegen"
 )
 
 type (
@@ -21,7 +22,7 @@ const (
 	EmptyString = ""
 )
 
-func GetGoTypes(in TypedParam, parents []string) (Types, error) {
+func GetGoTypes(in codegen.TypedParam, parents []string) (Types, error) {
 	schema, err := in.GetSchema()
 	if err != nil {
 		return nil, err
@@ -82,7 +83,7 @@ func GetGoTypes(in TypedParam, parents []string) (Types, error) {
 	return out, nil
 }
 
-func GetGoArrayType(dim int, key string, value TypedParam, parents []string) (Types, error) {
+func GetGoArrayType(dim int, key string, value codegen.TypedParam, parents []string) (Types, error) {
 	out := make(Types)
 	current := flaten(parents)
 	innerSchema, err := value.GetSchema()
@@ -126,7 +127,7 @@ func GetGoArrayType(dim int, key string, value TypedParam, parents []string) (Ty
 	return out, nil
 }
 
-func GetGoCombinatorType(key string, value TypedParam, parents []string) (Types, error) {
+func GetGoCombinatorType(key string, value codegen.TypedParam, parents []string) (Types, error) {
 	out := make(Types)
 	current := flaten(parents)
 	schema, err := value.GetSchema()

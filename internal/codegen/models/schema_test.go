@@ -1,4 +1,4 @@
-package mango
+package models
 
 import "github.com/vedadiyan/mango/static"
 

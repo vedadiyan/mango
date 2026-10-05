@@ -1,4 +1,4 @@
-package mango
+package models
 
 import (
 	"context"
@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/iancoleman/strcase"
+	"github.com/vedadiyan/mango/internal/codegen"
+	"github.com/vedadiyan/mango/internal/hack"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -17,12 +19,12 @@ func TestRead(t *testing.T) {
 	x := strcase.ToSnake("FirstName")
 
 	_ = x
-	pc, err := Parse("./schema_test.go")
+	pc, err := codegen.Parse("./schema_test.go")
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
 	}
-	schemas, err := GetSchemas(pc)
+	schemas, err := codegen.GetSchemas(pc)
 	for _, i := range schemas {
 		value, err := GetGoTypes(i.TypedParam, []string{i.Name})
 		if err != nil {
@@ -33,11 +35,11 @@ func TestRead(t *testing.T) {
 	}
 
 	registry := bson.NewRegistry()
-	RegisterCodec[X](registry)
+	hack.RegisterCodec[X](registry)
 
 	client, _ := mongo.Connect(options.Client().ApplyURI("mongodb://192.168.100.100:27017").SetRegistry(registry))
 
-	t1 := AutoInliner(reflect.TypeFor[X]())
+	t1 := hack.AutoInliner(reflect.TypeFor[X]())
 	test := X{}
 	test.Fields = &struct {
 		FieldsMetadata
@@ -50,7 +52,7 @@ func TestRead(t *testing.T) {
 	zzzzz, err := client.Database("abc").Collection("test").InsertOne(context.Background(), test)
 
 	_ = zzzzz
-	vallll := Convert(&test, t1).Interface()
+	vallll := hack.Convert(&test, t1).Interface()
 
 	_ = vallll
 
@@ -72,7 +74,7 @@ type Z struct {
 }
 
 type FieldsMetadata struct {
-	Metadata `bson:"Values"`
+	hack.Metadata `bson:"Values"`
 }
 
 type X struct {
