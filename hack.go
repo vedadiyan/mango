@@ -151,11 +151,12 @@ func IsMetadata(src reflect.Type) (reflect.StructTag, bool) {
 	case reflect.Struct:
 		{
 			for f := range src.Fields() {
-				if f.Anonymous && f.Type.AssignableTo(metadataType) {
-					for innerField := range f.Type.Fields() {
-						if innerField.Type.Implements(metadataType) {
-							return innerField.Tag, true
-						}
+				if !f.Anonymous || !f.Type.AssignableTo(metadataType) {
+					continue
+				}
+				for innerField := range f.Type.Fields() {
+					if innerField.Type.Implements(metadataType) {
+						return innerField.Tag, true
 					}
 				}
 			}
