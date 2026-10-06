@@ -2,6 +2,8 @@ package hack
 
 import (
 	"reflect"
+	"slices"
+	"strings"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -133,6 +135,12 @@ func AutoInliner(src reflect.Type) reflect.Type {
 func RewriteStruct(src reflect.Type) reflect.Type {
 	out := make([]reflect.StructField, 0)
 	for field := range src.Fields() {
+		typ := field.Type
+
+		if val, ok := field.Tag.Lookup("bson"); !ok || !IsOpaque(val) {
+			typ = AutoInliner(field.Type)
+		}
+
 		if !field.Anonymous {
 			tag := field.Tag
 			if tagValue, ok := IsMetadata(field.Type); ok {
@@ -144,7 +152,7 @@ func RewriteStruct(src reflect.Type) reflect.Type {
 				Index:     field.Index,
 				Offset:    field.Offset,
 				PkgPath:   field.PkgPath,
-				Type:      AutoInliner(field.Type),
+				Type:      typ,
 				Tag:       tag,
 			})
 			continue
@@ -156,7 +164,7 @@ func RewriteStruct(src reflect.Type) reflect.Type {
 				Index:     field.Index,
 				Offset:    field.Offset,
 				PkgPath:   field.PkgPath,
-				Type:      AutoInliner(field.Type),
+				Type:      typ,
 				Tag:       reflect.StructTag(`bson:"-"`),
 			})
 			continue
@@ -167,7 +175,7 @@ func RewriteStruct(src reflect.Type) reflect.Type {
 			Index:     field.Index,
 			Offset:    field.Offset,
 			PkgPath:   field.PkgPath,
-			Type:      AutoInliner(field.Type),
+			Type:      typ,
 			Tag:       reflect.StructTag(`bson:",inline"`),
 		})
 
@@ -224,6 +232,10 @@ func IsMetadata(src reflect.Type) (reflect.StructTag, bool) {
 			return "", false
 		}
 	}
+}
+
+func IsOpaque(str string) bool {
+	return slices.Contains(strings.Split(str, ","), "opaque")
 }
 
 func Convert(v any, typ reflect.Type) reflect.Value {
