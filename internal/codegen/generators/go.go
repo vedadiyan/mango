@@ -16,10 +16,18 @@ type (
 	GoArrayType  string
 
 	Types map[string]any
+
+	CombinatorType string
 )
 
 const (
 	EmptyString = ""
+
+	CombinatorTypeInavlid CombinatorType = "Invalid"
+	CombinatorTypeOneOf   CombinatorType = "OneOf"
+	CombinatorTypeAnyOf   CombinatorType = "AnyOf"
+	CombinatorTypeAllOf   CombinatorType = "AllOf"
+	CombinatorTypeNot     CombinatorType = "Not"
 )
 
 func GetGoTypes(in codegen.TypedParam, parents []string) (Types, error) {
@@ -54,14 +62,14 @@ func GetGoTypes(in codegen.TypedParam, parents []string) (Types, error) {
 			copyGoTypes(out, res)
 			continue
 		}
-		// if value.IsCombinator() {
-		// 	res, err := GetGoCombinatorType(key, value, append(parents, key))
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
-		// 	copyGoTypes(out, res)
-		// 	continue
-		// }
+		if value.IsCombinator() {
+			res, err := GetGoCombinatorType(key, value, append(parents, key))
+			if err != nil {
+				return nil, err
+			}
+			copyGoTypes(out, res)
+			continue
+		}
 		if value.IsObject() {
 			res, err := GetGoTypes(value, append(parents, key))
 			if err != nil {
@@ -128,6 +136,11 @@ func GetGoArrayType(dim int, key string, value codegen.TypedParam, parents []str
 }
 
 func GetGoCombinatorType(key string, value codegen.TypedParam, parents []string) (Types, error) {
+	combinatorType, ok := GetCombinatorType(value.TypeName)
+	if !ok {
+		return nil, fmt.Errorf("invalid combinator")
+	}
+
 	out := make(Types)
 	current := flaten(parents)
 	schema, err := value.GetSchema()
@@ -137,6 +150,7 @@ func GetGoCombinatorType(key string, value codegen.TypedParam, parents []string)
 	if schema == nil {
 		return nil, nil
 	}
+
 	specs, err := schema.GetSpecs()
 	if err != nil {
 		return nil, err
@@ -147,9 +161,23 @@ func GetGoCombinatorType(key string, value codegen.TypedParam, parents []string)
 		if err != nil {
 			return nil, err
 		}
-
+		combinatorName := fmt.Sprintf("(%s)%sVariation%d", combinatorType, key, i)
+		innerSchema, err := spec.GetSchema()
+		if err != nil {
+			return nil, nil
+		}
+		if innerSchema == nil {
+			continue
+		}
+		objectName, err := innerSchema.GetObjectName()
+		if err != nil {
+			return nil, err
+		}
+		if objectName != nil {
+			combinatorName = fmt.Sprintf("(%s)%s", combinatorType, MakePascalCase(*objectName))
+		}
 		if !spec.IsScalar() {
-			res, err := GetGoTypes(spec, append(parents, fmt.Sprintf("$%sVariation%d", key, i)))
+			res, err := GetGoTypes(spec, append(parents, combinatorName))
 			if err != nil {
 				return nil, err
 			}
@@ -159,7 +187,7 @@ func GetGoCombinatorType(key string, value codegen.TypedParam, parents []string)
 			if err != nil {
 				return nil, err
 			}
-			out[fmt.Sprintf("$%sVariation%d", key, i)] = finalType
+			out[combinatorName] = finalType
 		}
 
 		types = append(types, typ...)
@@ -218,7 +246,7 @@ func flaten[T any](in []T) string {
 		if i > 0 {
 			out.WriteRune('.')
 		}
-		out.WriteString(fmt.Sprintf("%v", value))
+		fmt.Fprintf(out, "%v", value)
 
 	}
 
@@ -227,4 +255,19 @@ func flaten[T any](in []T) string {
 
 func MakePascalCase(str string) string {
 	return strcase.ToCamel(str)
+}
+
+func GetCombinatorType(in string) (CombinatorType, bool) {
+	_, str, _ := strings.CutLast(strings.TrimFunc(in, func(r rune) bool { return r == '[' || r == ']' }), ".")
+	typ := CombinatorType(str)
+	switch typ {
+	case CombinatorTypeOneOf, CombinatorTypeAnyOf, CombinatorTypeAllOf, CombinatorTypeNot:
+		{
+			return typ, true
+		}
+	default:
+		{
+			return CombinatorType(""), false
+		}
+	}
 }

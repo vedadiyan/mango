@@ -52,6 +52,32 @@ func DefineExport() static.Schema {
 					},
 				},
 			},
+			"details": static.Combinator[static.OneOf]{
+				Specs: static.OneOf{
+					static.Composite{
+						ObjectName: "individual",
+						Properties: static.Properties{
+							"customer_name": static.Scalar{
+								Type: []static.BasicType{static.TypeString},
+							},
+							"email": static.Scalar{
+								Type: []static.BasicType{static.TypeString},
+							},
+						},
+					},
+					static.Composite{
+						ObjectName: "legal",
+						Properties: static.Properties{
+							"company_name": static.Scalar{
+								Type: []static.BasicType{static.TypeString},
+							},
+							"tax_id": static.Scalar{
+								Type: []static.BasicType{static.TypeString},
+							},
+						},
+					},
+				},
+			},
 		},
 		Conditions: static.Conditions{
 			{"$exists": static.Condition{

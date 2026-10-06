@@ -566,6 +566,9 @@ func (r RawSchema) GetConditions() ([]map[string]any, error) {
 	return parseCondition(items)
 }
 
+func (r RawSchema) GetObjectName() (*string, error) {
+	return r.LookupCast[string]("ObjectName")
+}
 func parseCondition(rawSchema []any) ([]map[string]any, error) {
 	items := make([]map[string]any, 0)
 	for _, value := range rawSchema {

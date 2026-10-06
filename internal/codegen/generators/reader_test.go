@@ -1,17 +1,11 @@
 package generators
 
 import (
-	"context"
 	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/iancoleman/strcase"
 	"github.com/vedadiyan/mango/internal/codegen"
-	"github.com/vedadiyan/mango/internal/hack"
-	"go.mongodb.org/mongo-driver/v2/bson"
-	"go.mongodb.org/mongo-driver/v2/mongo"
-	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 func TestRead(t *testing.T) {
@@ -34,53 +28,22 @@ func TestRead(t *testing.T) {
 		_ = value
 	}
 
-	registry := bson.NewRegistry()
-	hack.RegisterCodec[X](registry)
-
-	client, _ := mongo.Connect(options.Client().ApplyURI("mongodb://192.168.100.100:27017").SetRegistry(registry))
-
-	t1 := hack.AutoInliner(reflect.TypeFor[X]())
-	test := X{}
-	test.Fields = &struct {
-		FieldsMetadata
-		Y
-		Z
-	}{}
-	test.Fields.Name = "Pouya"
-	test.Fields.Username = "VPouya"
-
-	zzzzz, err := client.Database("abc").Collection("test").InsertOne(context.Background(), test)
-
-	_ = zzzzz
-	vallll := hack.Convert(&test, t1).Interface()
-
-	_ = vallll
-
-	// outtt, err := codec.Encode(&test)
-
-	// xxxxx, err := codec.Decode(outtt)
-
-	// _ = xxxxx
-	// fmt.Println()
-	// fmt.Println(string(outtt))
 }
 
-type Y struct {
-	Name string `bson:"Name"`
+type OneOfVariation1 struct {
+	CustomerName string
+	Email        string
 }
 
-type Z struct {
-	Username string `bson:"Username"`
+type OneOfVariation2 struct {
+	CompanyName string
+	TaxId       string
 }
 
-type FieldsMetadata struct {
-	hack.Metadata `bson:"Values"`
+type UnionType struct {
+	OneOfVariation1
+	OneOfVariation2
 }
 
-type X struct {
-	Fields *struct {
-		FieldsMetadata
-		Y
-		Z
-	}
+type EitherOf struct {
 }

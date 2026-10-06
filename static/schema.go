@@ -39,6 +39,8 @@ type (
 		MinProperties        int
 		AdditionalProperties bool
 		Index                Index
+
+		ObjectName string
 	}
 
 	Combinator[T OneOf | AnyOf | AllOf | Not] struct {
