@@ -54,6 +54,7 @@ func GetGoTypes(in codegen.TypedParam, parents []string) (Types, error) {
 
 	for key, value := range properties {
 		key = MakePascalCase(key)
+		typeName := key
 		if value.IsArray() {
 			res, err := GetGoArrayType(1, key, value, parents)
 			if err != nil {
@@ -76,12 +77,13 @@ func GetGoTypes(in codegen.TypedParam, parents []string) (Types, error) {
 				return nil, err
 			}
 			copyGoTypes(out, res)
+			typeName = flaten(append(parents, key))
 		}
 		typ, err := value.GetType()
 		if err != nil {
 			return nil, err
 		}
-		goType, err := GetGoType(typ, key)
+		goType, err := GetGoType(typ, typeName)
 		if err != nil {
 			return nil, err
 		}
@@ -135,7 +137,7 @@ func GetGoArrayType(dim int, key string, value codegen.TypedParam, parents []str
 	if err != nil {
 		return nil, err
 	}
-	finalType, err := GetGoType(typ, key)
+	finalType, err := GetGoType(typ, flaten(append(parents, key)))
 	if err != nil {
 		return nil, err
 	}
@@ -167,13 +169,16 @@ func GetGoCombinatorType(key string, value codegen.TypedParam, parents []string)
 	if err != nil {
 		return nil, err
 	}
-	types := make([]string, 0)
+	typeName := fmt.Sprintf("%s%s", combinatorType, key)
+	combinatorKey := flaten(append(parents, typeName))
+	out[combinatorKey] = make(map[string]string)
+
 	for i, spec := range specs {
 		typ, err := spec.GetType()
 		if err != nil {
 			return nil, err
 		}
-		combinatorName := fmt.Sprintf("(%s)%sVariation%d", combinatorType, key, i)
+		combinatorName := fmt.Sprintf("%sVariation%d", key, i)
 		innerSchema, err := spec.GetSchema()
 		if err != nil {
 			return nil, nil
@@ -186,29 +191,33 @@ func GetGoCombinatorType(key string, value codegen.TypedParam, parents []string)
 			return nil, err
 		}
 		if objectName != nil {
-			combinatorName = fmt.Sprintf("(%s)%s", combinatorType, MakePascalCase(*objectName))
+			combinatorName = MakePascalCase(*objectName)
 		}
-		if !spec.IsScalar() {
-			res, err := GetGoTypes(spec, append(parents, key, combinatorName))
+		flattenedKey := flaten(append(parents, typeName, combinatorName))
+
+		if spec.IsArray() {
+			res, err := GetGoArrayType(0, combinatorName, spec, append(parents, typeName))
 			if err != nil {
 				return nil, err
 			}
 			copyGoTypes(out, res)
-		} else {
-			finalType, err := GetGoType(typ, key)
+			continue
+		}
+		if spec.IsObject() {
+			res, err := GetGoTypes(spec, append(parents, typeName, combinatorName))
 			if err != nil {
 				return nil, err
 			}
-			out[current][combinatorName] = finalType
+			copyGoTypes(out, res)
 		}
 
-		types = append(types, typ...)
+		finalType, err := GetGoType(typ, flattenedKey)
+		if err != nil {
+			return nil, err
+		}
+		out[combinatorKey][combinatorName] = finalType
 	}
-	finalType, err := GetGoType(types, key)
-	if err != nil {
-		return nil, err
-	}
-	out[current][key] = finalType
+	out[current][key] = combinatorKey
 	return out, nil
 }
 
@@ -260,10 +269,7 @@ func copyGoTypes(dest Types, src Types) {
 func flaten[T any](in []T) string {
 	out := bytes.NewBufferString("")
 
-	for i, value := range in {
-		if i > 0 {
-			out.WriteRune('.')
-		}
+	for _, value := range in {
 		fmt.Fprintf(out, "%v", value)
 
 	}

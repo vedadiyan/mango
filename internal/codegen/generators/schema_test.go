@@ -52,6 +52,25 @@ func DefineExport() static.Schema {
 					},
 				},
 			},
+			"nd_array_complex": static.Array{
+				Items: static.Items{
+					static.Array{
+						Items: static.Items{
+							static.Array{
+								Items: static.Items{
+									static.Composite{
+										Properties: static.Properties{
+											"id": static.Scalar{
+												Type: []static.BasicType{static.TypeInt},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 			"details": static.Combinator[static.OneOf]{
 				Specs: static.OneOf{
 					static.Composite{
@@ -73,6 +92,22 @@ func DefineExport() static.Schema {
 							},
 							"tax_id": static.Scalar{
 								Type: []static.BasicType{static.TypeString},
+							},
+						},
+					},
+					static.Scalar{
+						ObjectName: "boolean",
+						Type:       []static.BasicType{static.TypeBool},
+					},
+					static.Array{
+						ObjectName: "InnerArray",
+						Items: static.Items{
+							static.Composite{
+								Properties: static.Properties{
+									"InnerArrayId": static.Scalar{
+										Type: []static.BasicType{static.TypeBinary},
+									},
+								},
 							},
 						},
 					},

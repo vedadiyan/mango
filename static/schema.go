@@ -27,6 +27,8 @@ type (
 		Pattern      string
 		Enum         []any
 		Index        Index
+
+		ObjectName string
 	}
 
 	Composite struct {
@@ -58,6 +60,8 @@ type (
 		UniqueItems     bool
 		AdditionalItems bool
 		Index           Index
+
+		ObjectName string
 	}
 
 	OneOf Items
