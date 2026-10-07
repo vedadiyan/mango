@@ -198,23 +198,26 @@ func ToBsonSchema(in codegen.TypedParam) (*BsonSchema, error) {
 
 	out.Properties = make(map[string]*BsonSchema)
 
-	// required, err := typeSchema.GetRequiredStringArray()
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// out.Required = append(out.Required, required...)
+	required, err := typeSchema.GetRequiredStringArray()
+	if err != nil {
+		return nil, err
+	}
+	out.Required = append(out.Required, required...)
 
-	// if oneOfs != nil {
-	// 	items := make([]*BsonSchema, 0)
-	// 	for _, item := range oneOfs {
-	// 		bsonSchema, err := ToBsonSchema(item)
-	// 		if err != nil {
-	// 			return nil, err
-	// 		}
-	// 		items = append(items, bsonSchema)
-	// 	}
-	// 	out.OneOf = items
-	// }
+	if oneOfs != nil {
+		items := make([]*BsonSchema, 0)
+		for _, item := range oneOfs {
+			bsonSchema, err := ToBsonSchema(item)
+			if err != nil {
+				return nil, err
+			}
+			for _, oneOf := range bsonSchema.OneOf {
+				oneOf.Required = append(oneOf.Required, bsonSchema.Required...)
+				items = append(items, oneOf)
+			}
+		}
+		out.OneOf = items
+	}
 
 	switch firstOrDefault(typ) {
 	case "oneof":

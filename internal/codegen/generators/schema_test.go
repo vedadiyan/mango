@@ -66,5 +66,47 @@ func DefineExport() static.Schema {
 				},
 			},
 		},
+		OneOf: []static.Combinator[static.OneOf]{
+			{
+				Required: []string{"hobbie"},
+				Specs: static.OneOf{
+					static.Composite{
+						Properties: static.Properties{
+							"hobbie": static.Scalar{
+								Type: static.BasicTypes{static.TypeString},
+							},
+							"hobbie2": static.Scalar{
+								Type: static.BasicTypes{static.TypeString},
+							},
+						},
+					},
+				},
+			},
+			{
+				Specs: static.OneOf{
+					static.Composite{
+						Properties: static.Properties{
+							"skills": static.Scalar{
+								Type:     static.BasicTypes{static.TypeString},
+								Required: true,
+							},
+						},
+					},
+				},
+			},
+		},
+		Conditions: static.Conditions{
+			{"$exists": static.Condition{
+				"X": static.Condition{
+					"Y": static.Conditions{
+						{
+							"Z": static.Condition{
+								"V": 1,
+							},
+						},
+					},
+				},
+			}},
+		},
 	}
 }

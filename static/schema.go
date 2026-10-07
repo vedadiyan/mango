@@ -48,6 +48,7 @@ type (
 	Combinator[T OneOf | AnyOf | AllOf | Not] struct {
 		Title       string
 		Description string
+		Required    []string
 		Specs       T
 		Index       Index
 	}
