@@ -3,6 +3,7 @@ package generators
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/iancoleman/strcase"
@@ -21,7 +22,7 @@ func TestRead(t *testing.T) {
 	}
 	schemas, err := codegen.GetSchemas(pc)
 	for _, i := range schemas {
-		value, err := ToBsonSchema(i.TypedParam)
+		value, err := GetGoTypes(i.TypedParam, []string{i.Name})
 		if err != nil {
 			t.FailNow()
 		}
@@ -29,6 +30,7 @@ func TestRead(t *testing.T) {
 		if err != nil {
 			t.FailNow()
 		}
+		os.WriteFile("schema.json", json, os.ModePerm)
 		fmt.Printf("%s\n", string(json))
 		_ = value
 	}

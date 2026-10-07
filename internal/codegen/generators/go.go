@@ -18,6 +18,12 @@ type (
 	Types map[string]map[string]string
 
 	CombinatorType string
+
+	GoTypeOptions struct {
+		optional string
+	}
+
+	GoTypeOption func(*GoTypeOptions)
 )
 
 const (
@@ -79,11 +85,34 @@ func GetGoTypes(in codegen.TypedParam, parents []string) (Types, error) {
 			copyGoTypes(out, res)
 			typeName = flaten(append(parents, key))
 		}
+
 		typ, err := value.GetType()
 		if err != nil {
 			return nil, err
 		}
-		goType, err := GetGoType(typ, typeName)
+
+		if typ == nil {
+			enum, err := value.GetEnum()
+			if err != nil {
+				return nil, err
+			}
+
+			typ = []string{flaten([]string{current, key})}
+			enumType := flaten([]string{"$", current, key})
+			if _, ok := out[enumType]; !ok {
+				out[enumType] = make(map[string]string)
+			}
+			for _, value := range enum {
+				val := fmt.Sprintf("%v", value)
+				out[enumType][flaten([]string{current, key, val})] = val
+			}
+		}
+
+		required, err := value.GetRequiredOrFalse()
+		if err != nil {
+			return nil, err
+		}
+		goType, err := GetGoType(typ, typeName, WithRequired(required))
 		if err != nil {
 			return nil, err
 		}
@@ -137,6 +166,7 @@ func GetGoArrayType(dim int, key string, value codegen.TypedParam, parents []str
 	if err != nil {
 		return nil, err
 	}
+
 	finalType, err := GetGoType(typ, flaten(append(parents, key)))
 	if err != nil {
 		return nil, err
@@ -211,7 +241,12 @@ func GetGoCombinatorType(key string, value codegen.TypedParam, parents []string)
 			copyGoTypes(out, res)
 		}
 
-		finalType, err := GetGoType(typ, flattenedKey)
+		required, err := spec.GetRequiredOrFalse()
+		if err != nil {
+			return nil, err
+		}
+
+		finalType, err := GetGoType(typ, flattenedKey, WithRequired(required))
 		if err != nil {
 			return nil, err
 		}
@@ -221,18 +256,31 @@ func GetGoCombinatorType(key string, value codegen.TypedParam, parents []string)
 	return out, nil
 }
 
-func GetGoType(in []string, name string) (string, error) {
+func WithRequired(required bool) GoTypeOption {
+	return func(gto *GoTypeOptions) {
+		if !required {
+			gto.optional = "*"
+		}
+	}
+}
+
+func GetGoType(in []string, name string, opts ...GoTypeOption) (string, error) {
 	if len(in) > 2 {
 		return "any", nil
 	}
 
-	optional := EmptyString
+	options := GoTypeOptions{}
+
+	for _, opt := range opts {
+		opt(&options)
+	}
+
 	typ := EmptyString
 	for _, i := range in {
 		switch i {
 		case "null":
 			{
-				optional = "*"
+				options.optional = "*"
 			}
 		case "object":
 			{
@@ -253,7 +301,7 @@ func GetGoType(in []string, name string) (string, error) {
 		return "any", nil
 	}
 
-	return fmt.Sprintf("%s%s", optional, typ), nil
+	return fmt.Sprintf("%s%s", options.optional, typ), nil
 }
 
 func copyGoTypes(dest Types, src Types) {

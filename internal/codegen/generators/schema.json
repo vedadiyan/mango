@@ -1,0 +1,34 @@
+{
+	"$ExportSubscription": {
+		"ExportSubscriptionAdvanced": "Advanced",
+		"ExportSubscriptionNormal": "Normal"
+	},
+	"Export": {
+		"Address": "*ExportAddress",
+		"Details": "ExportOneOfDetails",
+		"FirstName": "*string",
+		"LastName": "*string",
+		"Products": "[]ExportProducts",
+		"Subscription": "*ExportSubscription"
+	},
+	"ExportAddress": {
+		"PostalCode": "*string",
+		"Street": "*string"
+	},
+	"ExportOneOfDetails": {
+		"Individual": "*ExportOneOfDetailsIndividual",
+		"Legal": "*ExportOneOfDetailsLegal"
+	},
+	"ExportOneOfDetailsIndividual": {
+		"CustomerName": "string",
+		"Email": "string"
+	},
+	"ExportOneOfDetailsLegal": {
+		"CompanyName": "string",
+		"TaxId": "string"
+	},
+	"ExportProducts": {
+		"Id": "*int",
+		"Name": "*string"
+	}
+}

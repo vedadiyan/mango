@@ -83,8 +83,7 @@ type (
 		Not          []Combinator[Not]
 	}
 
-	BasicType string
-
+	BasicType  string
 	BasicTypes []BasicType
 
 	Items        []Type
