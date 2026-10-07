@@ -453,14 +453,21 @@ func (r TypedParam) GetEnum() ([]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	enum, err := innerSchema.LookupCast[[]any]("Enum")
+	enum, err := innerSchema.LookupCast[TypedParam]("Enum")
 	if err != nil {
 		return nil, err
 	}
 	if enum == nil {
 		return nil, nil
 	}
-	return *enum, nil
+	values, err := Cast[[]any](enum.Value)
+	if err != nil {
+		return nil, err
+	}
+	if values == nil {
+		return nil, nil
+	}
+	return *values, nil
 }
 
 func (r TypedParam) IsCombinator() bool {

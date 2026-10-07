@@ -25,6 +25,9 @@ func DefineExport() static.Schema {
 					},
 				},
 			},
+			"subscription": static.Scalar{
+				Enum: []any{"Normal", "Advanced"},
+			},
 			"address": static.Composite{
 				Properties: static.Properties{
 					"postal_code": static.Scalar{
