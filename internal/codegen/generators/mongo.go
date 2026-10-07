@@ -275,13 +275,14 @@ func ToBsonSchema(in codegen.TypedParam) (*BsonSchema, error) {
 				if err != nil {
 					return nil, err
 				}
-				required, err := value.GetRequired()
+				required, err := value.GetRequiredOrFalse()
 				if err != nil {
 					return nil, err
 				}
-				if required != nil && *required == true {
+				if required == true {
 					out.Required = append(out.Required, key)
 				}
+
 				out.Properties[key] = bsonSchema
 			}
 			if items != nil {

@@ -36,6 +36,7 @@ func DefineExport() static.Schema {
 				},
 			},
 			"details": static.Combinator[static.OneOf]{
+				Required: []string{"DUMMY_FIELD"},
 				Specs: static.OneOf{
 					static.Composite{
 						ObjectName: "individual",

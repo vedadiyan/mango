@@ -281,6 +281,53 @@ func (r TypedParam) GetRequired() (*bool, error) {
 	return innerSchema.LookupCast[bool]("Required")
 }
 
+func (r TypedParam) GetRequiredOrFalse() (bool, error) {
+	innerSchema, err := Cast[RawSchema](r.Value)
+	if err != nil {
+		return false, err
+	}
+	value := innerSchema.Lookup("Required")
+	switch t := value.(type) {
+	case bool:
+		{
+			return t, nil
+		}
+	default:
+		{
+			return false, nil
+		}
+	}
+}
+
+func (r RawSchema) GetRequiredStringArray() ([]string, error) {
+	required := r.Lookup("Required")
+	if required == nil {
+		return nil, nil
+	}
+	switch t := required.(type) {
+	case TypedParam:
+		{
+			values, err := Cast[[]any](t.Value)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]string, 0)
+			for _, i := range *values {
+				str, err := Cast[string](i)
+				if err != nil {
+					return nil, err
+				}
+				out = append(out, *str)
+			}
+			return out, nil
+		}
+	default:
+		{
+			return nil, nil
+		}
+	}
+}
+
 func (r TypedParam) GetMinLen() (*int64, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
@@ -588,35 +635,6 @@ func (r RawSchema) GetProperties() (Properties, error) {
 	}
 
 	return properties, nil
-}
-
-func (r RawSchema) GetRequiredStringArray() ([]string, error) {
-	required := r.Lookup("Required")
-	if required == nil {
-		return nil, nil
-	}
-	switch t := required.(type) {
-	case TypedParam:
-		{
-			values, err := Cast[[]any](t.Value)
-			if err != nil {
-				return nil, err
-			}
-			out := make([]string, 0)
-			for _, i := range *values {
-				str, err := Cast[string](i)
-				if err != nil {
-					return nil, err
-				}
-				out = append(out, *str)
-			}
-			return out, nil
-		}
-	default:
-		{
-			return nil, nil
-		}
-	}
 }
 
 func (r RawSchema) GetConditions() ([]map[string]any, error) {
