@@ -48,12 +48,11 @@ type (
 	Combinator[T OneOf | AnyOf | AllOf | Not] struct {
 		Title       string
 		Description string
-		Required    bool
 		Specs       T
 		Index       Index
 	}
 
-	Array[T Items | Composite | Scalar] struct {
+	Array[T Positional | Composite | Scalar] struct {
 		Items           T
 		MinItems        int
 		MaxItems        int
@@ -63,6 +62,8 @@ type (
 
 		ObjectName string
 	}
+
+	Positional Items
 
 	OneOf Items
 	AnyOf Items
@@ -75,9 +76,15 @@ type (
 		Properties   Properties
 		Dependencies Dependencies
 		Conditions   Conditions
+		OneOf        []Combinator[OneOf]
+		AnyOf        []Combinator[AnyOf]
+		AllOf        []Combinator[AllOf]
+		Not          []Combinator[Not]
 	}
 
 	BasicType string
+
+	BasicTypes []BasicType
 
 	Items        []Type
 	Properties   map[string]Type

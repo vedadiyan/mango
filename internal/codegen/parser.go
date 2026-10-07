@@ -31,13 +31,15 @@ type (
 )
 
 const (
-	ScalarType = "github.com/vedadiyan/mango/static.Scalar"
-	ObjectType = "github.com/vedadiyan/mango/static.Composite"
-	ArrayType  = "github.com/vedadiyan/mango/static.Array"
-	OneOf      = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.OneOf]"
-	AnyOf      = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.AnyOf]"
-	AllOf      = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.AllOf]"
-	Not        = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.Not]"
+	ScalarType          = "github.com/vedadiyan/mango/static.Scalar"
+	ObjectType          = "github.com/vedadiyan/mango/static.Composite"
+	ScalarArrayType     = "github.com/vedadiyan/mango/static.Array[github.com/vedadiyan/mango/static.Scalar]"
+	CompositArrayType   = "github.com/vedadiyan/mango/static.Array[github.com/vedadiyan/mango/static.Composite]"
+	PositionalArrayType = "github.com/vedadiyan/mango/static.Array[github.com/vedadiyan/mango/static.Positional]"
+	OneOf               = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.OneOf]"
+	AnyOf               = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.AnyOf]"
+	AllOf               = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.AllOf]"
+	Not                 = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.Not]"
 )
 
 func Parse(filePath string) (*ParserContext, error) {
@@ -429,7 +431,7 @@ func (r TypedParam) IsCombinator() bool {
 
 func (r TypedParam) IsArray() bool {
 	switch r.TypeName {
-	case ArrayType:
+	case ScalarArrayType, CompositArrayType, PositionalArrayType:
 		{
 			return true
 		}
@@ -442,7 +444,7 @@ func (r TypedParam) IsArray() bool {
 
 func (r TypedParam) IsScalar() bool {
 	switch r.TypeName {
-	case ArrayType, ObjectType, OneOf, AnyOf, AllOf, Not:
+	case ScalarArrayType, CompositArrayType, PositionalArrayType, ObjectType, OneOf, AnyOf, AllOf, Not:
 		{
 			return false
 		}
@@ -477,7 +479,7 @@ func (r TypedParam) GetType() ([]string, error) {
 		{
 			return []string{"object"}, nil
 		}
-	case ArrayType:
+	case ScalarArrayType, CompositArrayType, PositionalArrayType:
 		{
 			return []string{"array"}, nil
 		}
@@ -527,6 +529,43 @@ func (r TypedParam) GetType() ([]string, error) {
 	return out, nil
 }
 
+func (r TypedParam) GetOneOfs() ([]TypedParam, error) {
+	rawSchema, err := r.GetSchema()
+	if err != nil {
+		return nil, err
+	}
+	if rawSchema == nil {
+		return nil, nil
+	}
+	oneOfs, err := rawSchema.LookupCast[TypedParam]("OneOf")
+	if err != nil {
+		return nil, err
+	}
+	if oneOfs == nil {
+		return nil, nil
+	}
+	values, err := Cast[[]any](oneOfs.Value)
+	if err != nil {
+		return nil, err
+	}
+	if values == nil {
+		return nil, nil
+	}
+	out := make([]TypedParam, 0)
+	for _, value := range *values {
+		typedParam, err := Cast[TypedParam](value)
+		if err != nil {
+			return nil, err
+		}
+		if typedParam == nil {
+			continue
+		}
+		out = append(out, *typedParam)
+	}
+
+	return out, nil
+}
+
 func (r RawSchema) GetProperties() (Properties, error) {
 	typedParam, err := r.LookupCast[TypedParam]("Properties")
 	if err != nil {
@@ -549,6 +588,35 @@ func (r RawSchema) GetProperties() (Properties, error) {
 	}
 
 	return properties, nil
+}
+
+func (r RawSchema) GetRequiredStringArray() ([]string, error) {
+	required := r.Lookup("Required")
+	if required == nil {
+		return nil, nil
+	}
+	switch t := required.(type) {
+	case TypedParam:
+		{
+			values, err := Cast[[]any](t.Value)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]string, 0)
+			for _, i := range *values {
+				str, err := Cast[string](i)
+				if err != nil {
+					return nil, err
+				}
+				out = append(out, *str)
+			}
+			return out, nil
+		}
+	default:
+		{
+			return nil, nil
+		}
+	}
 }
 
 func (r RawSchema) GetConditions() ([]map[string]any, error) {
@@ -674,6 +742,27 @@ func (r RawSchema) GetItems() (any, error) {
 	default:
 		{
 			return *typedParam, nil
+		}
+	}
+}
+
+func (r RawSchema) GetItemsAsArray() (Items, error) {
+	typedParam, err := r.LookupCast[TypedParam]("Items")
+	if err != nil {
+		return nil, err
+	}
+	if typedParam == nil {
+		return nil, nil
+	}
+
+	switch t := typedParam.Value.(type) {
+	case []any:
+		{
+			return r.getItemsArray(t)
+		}
+	default:
+		{
+			return Items{*typedParam}, nil
 		}
 	}
 }
