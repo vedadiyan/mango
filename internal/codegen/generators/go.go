@@ -15,7 +15,7 @@ type (
 	GoStructType string
 	GoArrayType  string
 
-	Types map[string]any
+	Types map[string]map[string]string
 
 	CombinatorType string
 )
@@ -55,7 +55,7 @@ func GetGoTypes(in codegen.TypedParam, parents []string) (Types, error) {
 	for key, value := range properties {
 		key = MakePascalCase(key)
 		if value.IsArray() {
-			res, err := GetGoArrayType(1, key, value, append(parents, key))
+			res, err := GetGoArrayType(1, key, value, parents)
 			if err != nil {
 				return nil, err
 			}
@@ -63,7 +63,7 @@ func GetGoTypes(in codegen.TypedParam, parents []string) (Types, error) {
 			continue
 		}
 		if value.IsCombinator() {
-			res, err := GetGoCombinatorType(key, value, append(parents, key))
+			res, err := GetGoCombinatorType(key, value, parents)
 			if err != nil {
 				return nil, err
 			}
@@ -85,7 +85,10 @@ func GetGoTypes(in codegen.TypedParam, parents []string) (Types, error) {
 		if err != nil {
 			return nil, err
 		}
-		out[fmt.Sprintf("%s.%s", current, key)] = goType
+		if _, ok := out[current]; !ok {
+			out[current] = make(map[string]string)
+		}
+		out[current][key] = goType
 	}
 
 	return out, nil
@@ -102,13 +105,18 @@ func GetGoArrayType(dim int, key string, value codegen.TypedParam, parents []str
 	if err != nil {
 		return nil, err
 	}
+
+	if _, ok := out[current]; !ok {
+		out[current] = make(map[string]string)
+	}
+
 	if len(items) > 1 {
-		out[current] = "[]any"
+		out[current][key] = "[]any"
 		return out, nil
 	}
 
 	if items[0].IsObject() {
-		res, err := GetGoTypes(items[0], parents)
+		res, err := GetGoTypes(items[0], append(parents, key))
 		if err != nil {
 			return nil, err
 		}
@@ -131,7 +139,7 @@ func GetGoArrayType(dim int, key string, value codegen.TypedParam, parents []str
 	if err != nil {
 		return nil, err
 	}
-	out[current] = fmt.Sprintf("%s%s", strings.Repeat("[]", dim), finalType)
+	out[current][key] = fmt.Sprintf("%s%s", strings.Repeat("[]", dim), finalType)
 	return out, nil
 }
 
@@ -149,6 +157,10 @@ func GetGoCombinatorType(key string, value codegen.TypedParam, parents []string)
 	}
 	if schema == nil {
 		return nil, nil
+	}
+
+	if _, ok := out[current]; !ok {
+		out[current] = make(map[string]string)
 	}
 
 	specs, err := schema.GetSpecs()
@@ -177,7 +189,7 @@ func GetGoCombinatorType(key string, value codegen.TypedParam, parents []string)
 			combinatorName = fmt.Sprintf("(%s)%s", combinatorType, MakePascalCase(*objectName))
 		}
 		if !spec.IsScalar() {
-			res, err := GetGoTypes(spec, append(parents, combinatorName))
+			res, err := GetGoTypes(spec, append(parents, key, combinatorName))
 			if err != nil {
 				return nil, err
 			}
@@ -187,7 +199,7 @@ func GetGoCombinatorType(key string, value codegen.TypedParam, parents []string)
 			if err != nil {
 				return nil, err
 			}
-			out[combinatorName] = finalType
+			out[current][combinatorName] = finalType
 		}
 
 		types = append(types, typ...)
@@ -196,11 +208,11 @@ func GetGoCombinatorType(key string, value codegen.TypedParam, parents []string)
 	if err != nil {
 		return nil, err
 	}
-	out[fmt.Sprintf("%s.%s", current, key)] = finalType
+	out[current][key] = finalType
 	return out, nil
 }
 
-func GetGoType(in []string, name string) (any, error) {
+func GetGoType(in []string, name string) (string, error) {
 	if len(in) > 2 {
 		return "any", nil
 	}
@@ -229,14 +241,20 @@ func GetGoType(in []string, name string) (any, error) {
 	}
 
 	if strings.TrimSpace(typ) == EmptyString {
-		return GoBasicType("any"), nil
+		return "any", nil
 	}
 
 	return fmt.Sprintf("%s%s", optional, typ), nil
 }
 
 func copyGoTypes(dest Types, src Types) {
-	maps.Copy(dest, src)
+	for key, value := range src {
+		if _, ok := dest[key]; !ok {
+			dest[key] = value
+			continue
+		}
+		maps.Copy(dest[key], value)
+	}
 }
 
 func flaten[T any](in []T) string {
