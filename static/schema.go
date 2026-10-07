@@ -53,8 +53,8 @@ type (
 		Index       Index
 	}
 
-	Array struct {
-		Items           Items
+	Array[T Items | Composite | Scalar] struct {
+		Items           T
 		MinItems        int
 		MaxItems        int
 		UniqueItems     bool
@@ -118,6 +118,6 @@ func (Combinator[T]) typ() {
 	justPanic()
 }
 
-func (Array) typ() {
+func (Array[T]) typ() {
 	justPanic()
 }

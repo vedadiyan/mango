@@ -1,6 +1,7 @@
 package generators
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -20,11 +21,15 @@ func TestRead(t *testing.T) {
 	}
 	schemas, err := codegen.GetSchemas(pc)
 	for _, i := range schemas {
-		value, err := GetGoTypes(i.TypedParam, []string{i.Name})
+		value, err := ToBsonSchema(i.TypedParam)
 		if err != nil {
 			t.FailNow()
 		}
-		fmt.Printf("%v", value)
+		json, err := json.MarshalIndent(value, "", "\t")
+		if err != nil {
+			t.FailNow()
+		}
+		fmt.Printf("%s\n", string(json))
 		_ = value
 	}
 

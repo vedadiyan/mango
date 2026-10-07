@@ -657,7 +657,7 @@ func (r TypedParam) getConditions() ([]map[string]any, error) {
 
 }
 
-func (r RawSchema) GetItems() (Items, error) {
+func (r RawSchema) GetItems() (any, error) {
 	typedParam, err := r.LookupCast[TypedParam]("Items")
 	if err != nil {
 		return nil, err
@@ -665,10 +665,20 @@ func (r RawSchema) GetItems() (Items, error) {
 	if typedParam == nil {
 		return nil, nil
 	}
-	rawSchema, err := CopyCast[[]any](typedParam.Value)
-	if err != nil {
-		return nil, err
+
+	switch t := typedParam.Value.(type) {
+	case []any:
+		{
+			return r.getItemsArray(t)
+		}
+	default:
+		{
+			return *typedParam, nil
+		}
 	}
+}
+
+func (r RawSchema) getItemsArray(rawSchema []any) (Items, error) {
 	items := make(Items, 0)
 	for _, value := range rawSchema {
 		typedParam, err := Cast[TypedParam](value)

@@ -103,7 +103,7 @@ func GetGoArrayType(dim int, key string, value codegen.TypedParam, parents []str
 	if err != nil {
 		return nil, err
 	}
-	items, err := innerSchema.GetItems()
+	items_, err := innerSchema.GetItems()
 	if err != nil {
 		return nil, err
 	}
@@ -111,6 +111,8 @@ func GetGoArrayType(dim int, key string, value codegen.TypedParam, parents []str
 	if _, ok := out[current]; !ok {
 		out[current] = make(map[string]string)
 	}
+
+	items := items_.(codegen.Items)
 
 	if len(items) > 1 {
 		out[current][key] = "[]any"

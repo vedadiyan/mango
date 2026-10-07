@@ -13,16 +13,14 @@ func DefineExport() static.Schema {
 			"last_name": static.Scalar{
 				Type: []static.BasicType{static.TypeString},
 			},
-			"products": static.Array{
-				Items: static.Items{
-					static.Composite{
-						Properties: static.Properties{
-							"id": static.Scalar{
-								Type: []static.BasicType{static.TypeInt},
-							},
-							"name": static.Scalar{
-								Type: []static.BasicType{static.TypeString},
-							},
+			"products": static.Array[static.Composite]{
+				Items: static.Composite{
+					Properties: static.Properties{
+						"id": static.Scalar{
+							Type: []static.BasicType{static.TypeInt},
+						},
+						"name": static.Scalar{
+							Type: []static.BasicType{static.TypeString},
 						},
 					},
 				},
@@ -37,11 +35,11 @@ func DefineExport() static.Schema {
 					},
 				},
 			},
-			"nd_array": static.Array{
+			"nd_array": static.Array[static.Items]{
 				Items: static.Items{
-					static.Array{
+					static.Array[static.Items]{
 						Items: static.Items{
-							static.Array{
+							static.Array[static.Items]{
 								Items: static.Items{
 									static.Scalar{
 										Type: []static.BasicType{static.TypeInt},
@@ -52,11 +50,11 @@ func DefineExport() static.Schema {
 					},
 				},
 			},
-			"nd_array_complex": static.Array{
+			"nd_array_complex": static.Array[static.Items]{
 				Items: static.Items{
-					static.Array{
+					static.Array[static.Items]{
 						Items: static.Items{
-							static.Array{
+							static.Array[static.Items]{
 								Items: static.Items{
 									static.Composite{
 										Properties: static.Properties{
@@ -77,10 +75,12 @@ func DefineExport() static.Schema {
 						ObjectName: "individual",
 						Properties: static.Properties{
 							"customer_name": static.Scalar{
-								Type: []static.BasicType{static.TypeString},
+								Type:     []static.BasicType{static.TypeString},
+								Required: true,
 							},
 							"email": static.Scalar{
-								Type: []static.BasicType{static.TypeString},
+								Type:     []static.BasicType{static.TypeString},
+								Required: true,
 							},
 						},
 					},
@@ -88,26 +88,12 @@ func DefineExport() static.Schema {
 						ObjectName: "legal",
 						Properties: static.Properties{
 							"company_name": static.Scalar{
-								Type: []static.BasicType{static.TypeString},
+								Type:     []static.BasicType{static.TypeString},
+								Required: true,
 							},
 							"tax_id": static.Scalar{
-								Type: []static.BasicType{static.TypeString},
-							},
-						},
-					},
-					static.Scalar{
-						ObjectName: "boolean",
-						Type:       []static.BasicType{static.TypeBool},
-					},
-					static.Array{
-						ObjectName: "InnerArray",
-						Items: static.Items{
-							static.Composite{
-								Properties: static.Properties{
-									"InnerArrayId": static.Scalar{
-										Type: []static.BasicType{static.TypeBinary},
-									},
-								},
+								Type:     []static.BasicType{static.TypeString},
+								Required: true,
 							},
 						},
 					},

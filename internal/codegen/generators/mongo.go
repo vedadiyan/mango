@@ -2,6 +2,7 @@ package generators
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/vedadiyan/mango/internal/codegen"
 )
@@ -18,7 +19,7 @@ type (
 		Description  *string                `json:"description,omitempty"`
 		Type         []string               `json:"bsonType,omitempty"`
 		Properties   map[string]*BsonSchema `json:"properties,omitempty"`
-		Items        []*BsonSchema          `json:"items,omitempty"`
+		Items        any                    `json:"items,omitempty"`
 		Required     []string               `json:"required,omitempty"`
 		Dependencies map[string][]string    `json:"dependencies,omitempty"`
 		Enum         []any                  `json:"enum,omitempty"`
@@ -193,33 +194,40 @@ func ToBsonSchema(in codegen.TypedParam) (*BsonSchema, error) {
 	switch firstOrDefault(typ) {
 	case "oneof":
 		{
+			items := make([]*BsonSchema, 0)
 			for _, item := range specs {
 				bsonSchema, err := ToBsonSchema(item)
 				if err != nil {
 					return nil, err
 				}
-				out.OneOf = append(out.Items, bsonSchema)
+				items = append(items, bsonSchema)
 			}
+			out.OneOf = items
 		}
 	case "anyof":
 		{
+			items := make([]*BsonSchema, 0)
 			for _, item := range specs {
 				bsonSchema, err := ToBsonSchema(item)
 				if err != nil {
 					return nil, err
 				}
-				out.AnyOf = append(out.Items, bsonSchema)
+				items = append(items, bsonSchema)
 			}
+			out.AnyOf = items
 		}
 	case "allof":
 		{
+
+			items := make([]*BsonSchema, 0)
 			for _, item := range specs {
 				bsonSchema, err := ToBsonSchema(item)
 				if err != nil {
 					return nil, err
 				}
-				out.AllOf = append(out.Items, bsonSchema)
+				items = append(items, bsonSchema)
 			}
+			out.AllOf = items
 		}
 	case "not":
 		{
@@ -248,13 +256,36 @@ func ToBsonSchema(in codegen.TypedParam) (*BsonSchema, error) {
 				}
 				out.Properties[key] = bsonSchema
 			}
+			if items != nil {
 
-			for _, item := range items {
-				bsonSchema, err := ToBsonSchema(item)
-				if err != nil {
-					return nil, err
+				switch t := items.(type) {
+				case codegen.Items:
+					{
+						out.Type = []string{"array"}
+						items := make([]*BsonSchema, 0)
+						for _, item := range t {
+							bsonSchema, err := ToBsonSchema(item)
+							if err != nil {
+								return nil, err
+							}
+							items = append(items, bsonSchema)
+						}
+						out.Items = items
+					}
+				case codegen.TypedParam:
+					{
+						out.Type = []string{"array"}
+						val, err := ToBsonSchema(t)
+						if err != nil {
+							return nil, err
+						}
+						out.Items = val
+					}
+				default:
+					{
+						return nil, fmt.Errorf("expected either `Items` or `TypedParam` but got `%T`", t)
+					}
 				}
-				out.Items = append(out.Items, bsonSchema)
 			}
 
 		}
