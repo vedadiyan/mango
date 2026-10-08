@@ -205,18 +205,15 @@ func ToBsonSchema(in codegen.TypedParam) (*BsonSchema, error) {
 	out.Required = append(out.Required, required...)
 
 	if oneOfs != nil {
-		items := make([]*BsonSchema, 0)
-		for _, item := range oneOfs {
-			bsonSchema, err := ToBsonSchema(item)
-			if err != nil {
-				return nil, err
-			}
-			for _, oneOf := range bsonSchema.OneOf {
-				oneOf.Required = append(oneOf.Required, bsonSchema.Required...)
-				items = append(items, oneOf)
-			}
+		bsonSchema, err := ToBsonSchema(*oneOfs)
+		if err != nil {
+			return nil, err
 		}
-		out.OneOf = items
+		// for _, oneOf := range bsonSchema.OneOf {
+		// 	oneOf.Required = append(oneOf.Required, bsonSchema.Required...)
+		// 	items = append(items, oneOf)
+		// }
+		out.OneOf = append(out.OneOf, bsonSchema.OneOf...)
 	}
 
 	switch firstOrDefault(typ) {

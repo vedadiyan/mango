@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 
 	"github.com/iancoleman/strcase"
@@ -51,18 +52,24 @@ func GetGoTypes(in codegen.TypedParam, parents []string) (Types, error) {
 		return nil, err
 	}
 
-	if properties == nil {
-		return nil, nil
+	oneOfs, err := in.GetOneOfs()
+	if err != nil {
+		return nil, err
+	}
+
+	requiredList, err := schema.GetRequiredStringArray()
+	if err != nil {
+		return nil, err
 	}
 
 	out := make(Types)
 	current := flaten(parents)
 
 	for key, value := range properties {
-		key = MakePascalCase(key)
-		typeName := key
+		pascalCaseKey := MakePascalCase(key)
+		typeName := pascalCaseKey
 		if value.IsArray() {
-			res, err := GetGoArrayType(1, key, value, parents)
+			res, err := GetGoArrayType(1, pascalCaseKey, value, parents)
 			if err != nil {
 				return nil, err
 			}
@@ -70,7 +77,7 @@ func GetGoTypes(in codegen.TypedParam, parents []string) (Types, error) {
 			continue
 		}
 		if value.IsCombinator() {
-			res, err := GetGoCombinatorType(key, value, parents)
+			res, err := GetGoCombinatorType(pascalCaseKey, value, parents)
 			if err != nil {
 				return nil, err
 			}
@@ -78,12 +85,12 @@ func GetGoTypes(in codegen.TypedParam, parents []string) (Types, error) {
 			continue
 		}
 		if value.IsObject() {
-			res, err := GetGoTypes(value, append(parents, key))
+			res, err := GetGoTypes(value, append(parents, pascalCaseKey))
 			if err != nil {
 				return nil, err
 			}
 			copyGoTypes(out, res)
-			typeName = flaten(append(parents, key))
+			typeName = flaten(append(parents, pascalCaseKey))
 		}
 
 		typ, err := value.GetType()
@@ -97,20 +104,23 @@ func GetGoTypes(in codegen.TypedParam, parents []string) (Types, error) {
 				return nil, err
 			}
 
-			typ = []string{flaten([]string{current, key})}
-			enumType := flaten([]string{"$", current, key})
+			typ = []string{flaten([]string{current, pascalCaseKey})}
+			enumType := flaten([]string{"$", current, pascalCaseKey})
 			if _, ok := out[enumType]; !ok {
 				out[enumType] = make(map[string]string)
 			}
 			for _, value := range enum {
 				val := fmt.Sprintf("%v", value)
-				out[enumType][flaten([]string{current, key, val})] = val
+				out[enumType][flaten([]string{current, pascalCaseKey, val})] = val
 			}
 		}
 
 		required, err := value.GetRequiredOrFalse()
 		if err != nil {
 			return nil, err
+		}
+		if slices.Contains(requiredList, key) {
+			required = true
 		}
 		goType, err := GetGoType(typ, typeName, WithRequired(required))
 		if err != nil {
@@ -119,7 +129,16 @@ func GetGoTypes(in codegen.TypedParam, parents []string) (Types, error) {
 		if _, ok := out[current]; !ok {
 			out[current] = make(map[string]string)
 		}
-		out[current][key] = goType
+		out[current][pascalCaseKey] = goType
+	}
+
+	l := len(parents)
+	if oneOfs != nil {
+		res, err := GetGoCombinatorType(parents[l-1], *oneOfs, parents[:l-1])
+		if err != nil {
+			return nil, err
+		}
+		copyGoTypes(out, res)
 	}
 
 	return out, nil
@@ -182,7 +201,10 @@ func GetGoCombinatorType(key string, value codegen.TypedParam, parents []string)
 	}
 
 	out := make(Types)
-	current := flaten(parents)
+	current := key
+	if len(parents) > 0 {
+		current = flaten(parents)
+	}
 	schema, err := value.GetSchema()
 	if err != nil {
 		return nil, err
@@ -252,7 +274,9 @@ func GetGoCombinatorType(key string, value codegen.TypedParam, parents []string)
 		}
 		out[combinatorKey][combinatorName] = finalType
 	}
-	out[current][key] = combinatorKey
+	if len(key) != 0 {
+		out[current][key] = combinatorKey
+	}
 	return out, nil
 }
 

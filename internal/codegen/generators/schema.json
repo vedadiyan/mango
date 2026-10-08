@@ -6,6 +6,7 @@
 	"Export": {
 		"Address": "*ExportAddress",
 		"Details": "ExportOneOfDetails",
+		"Export": "OneOfExport",
 		"FirstName": "*string",
 		"LastName": "*string",
 		"Products": "[]ExportProducts",
@@ -30,5 +31,16 @@
 	"ExportProducts": {
 		"Id": "*int",
 		"Name": "*string"
+	},
+	"OneOfExport": {
+		"ExportVariation0": "*OneOfExportExportVariation0",
+		"ExportVariation1": "*OneOfExportExportVariation1"
+	},
+	"OneOfExportExportVariation0": {
+		"Hobbie": "string",
+		"Hobbie2": "*string"
+	},
+	"OneOfExportExportVariation1": {
+		"Skills": "string"
 	}
 }

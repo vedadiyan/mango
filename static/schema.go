@@ -34,7 +34,7 @@ type (
 	Composite struct {
 		Title                string
 		Description          string
-		Required             bool
+		Required             any
 		Properties           Properties
 		Dependencies         Dependencies
 		MaxProperties        int
@@ -48,7 +48,6 @@ type (
 	Combinator[T OneOf | AnyOf | AllOf | Not] struct {
 		Title       string
 		Description string
-		Required    []string
 		Specs       T
 		Index       Index
 	}
@@ -77,10 +76,10 @@ type (
 		Properties   Properties
 		Dependencies Dependencies
 		Conditions   Conditions
-		OneOf        []Combinator[OneOf]
-		AnyOf        []Combinator[AnyOf]
-		AllOf        []Combinator[AllOf]
-		Not          []Combinator[Not]
+		OneOf        Combinator[OneOf]
+		AnyOf        Combinator[AnyOf]
+		AllOf        Combinator[AllOf]
+		Not          Combinator[Not]
 	}
 
 	BasicType  string

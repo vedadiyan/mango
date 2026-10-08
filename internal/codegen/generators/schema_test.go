@@ -1,6 +1,8 @@
 package generators
 
-import "github.com/vedadiyan/mango/static"
+import (
+	"github.com/vedadiyan/mango/static"
+)
 
 func DefineExport() static.Schema {
 	return static.Schema{
@@ -39,7 +41,6 @@ func DefineExport() static.Schema {
 				},
 			},
 			"details": static.Combinator[static.OneOf]{
-				Required: []string{"DUMMY_FIELD"},
 				Specs: static.OneOf{
 					static.Composite{
 						ObjectName: "individual",
@@ -70,30 +71,24 @@ func DefineExport() static.Schema {
 				},
 			},
 		},
-		OneOf: []static.Combinator[static.OneOf]{
-			{
-				Required: []string{"hobbie"},
-				Specs: static.OneOf{
-					static.Composite{
-						Properties: static.Properties{
-							"hobbie": static.Scalar{
-								Type: static.BasicTypes{static.TypeString},
-							},
-							"hobbie2": static.Scalar{
-								Type: static.BasicTypes{static.TypeString},
-							},
+		OneOf: static.Combinator[static.OneOf]{
+			Specs: static.OneOf{
+				static.Composite{
+					Required: []string{"hobbie"},
+					Properties: static.Properties{
+						"hobbie": static.Scalar{
+							Type: static.BasicTypes{static.TypeString},
+						},
+						"hobbie2": static.Scalar{
+							Type: static.BasicTypes{static.TypeString},
 						},
 					},
 				},
-			},
-			{
-				Specs: static.OneOf{
-					static.Composite{
-						Properties: static.Properties{
-							"skills": static.Scalar{
-								Type:     static.BasicTypes{static.TypeString},
-								Required: true,
-							},
+				static.Composite{
+					Properties: static.Properties{
+						"skills": static.Scalar{
+							Type:     static.BasicTypes{static.TypeString},
+							Required: true,
 						},
 					},
 				},

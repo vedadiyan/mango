@@ -583,7 +583,7 @@ func (r TypedParam) GetType() ([]string, error) {
 	return out, nil
 }
 
-func (r TypedParam) GetOneOfs() ([]TypedParam, error) {
+func (r TypedParam) GetOneOfs() (*TypedParam, error) {
 	rawSchema, err := r.GetSchema()
 	if err != nil {
 		return nil, err
@@ -595,29 +595,8 @@ func (r TypedParam) GetOneOfs() ([]TypedParam, error) {
 	if err != nil {
 		return nil, err
 	}
-	if oneOfs == nil {
-		return nil, nil
-	}
-	values, err := Cast[[]any](oneOfs.Value)
-	if err != nil {
-		return nil, err
-	}
-	if values == nil {
-		return nil, nil
-	}
-	out := make([]TypedParam, 0)
-	for _, value := range *values {
-		typedParam, err := Cast[TypedParam](value)
-		if err != nil {
-			return nil, err
-		}
-		if typedParam == nil {
-			continue
-		}
-		out = append(out, *typedParam)
-	}
+	return oneOfs, nil
 
-	return out, nil
 }
 
 func (r RawSchema) GetProperties() (Properties, error) {
