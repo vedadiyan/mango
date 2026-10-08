@@ -65,13 +65,15 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 	}
 
 	out := make(Types)
-	current := flaten(parents)
+	parentIdentKey := flaten(parents)
+	out[parentIdentKey] = make(map[string]string)
 
-	for key, value := range properties {
-		pascalCaseKey := MakePascalCase(key)
-		typeName := pascalCaseKey
+	for explicitKey, value := range properties {
+		identKey := MakePascalCase(explicitKey)
+		currentIdentSlice := append(parents, identKey)
+		typeName := identKey
 		if value.IsArray() {
-			res, err := ToGoArrayType(1, pascalCaseKey, value, parents)
+			res, err := ToGoArrayType(1, identKey, value, parents)
 			if err != nil {
 				return nil, err
 			}
@@ -79,7 +81,7 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 			continue
 		}
 		if value.IsCombinator() {
-			res, err := ToGoCombinatorType(pascalCaseKey, value, parents)
+			res, err := ToGoCombinatorType(identKey, value, parents)
 			if err != nil {
 				return nil, err
 			}
@@ -87,51 +89,50 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 			continue
 		}
 		if value.IsObject() {
-			res, err := ToGoTypeModel(value, append(parents, pascalCaseKey), forceOptional)
+			res, err := ToGoTypeModel(value, currentIdentSlice, forceOptional)
 			if err != nil {
 				return nil, err
 			}
 			deepCopy(out, res)
-			typeName = flaten(append(parents, pascalCaseKey))
+			typeName = flaten(currentIdentSlice)
 		}
 
-		typ, err := value.GetType()
+		explicitType, err := value.GetType()
 		if err != nil {
 			return nil, err
 		}
 
-		if typ == nil {
-			enum, err := value.GetEnum()
+		constructedType := explicitType
+
+		if explicitType == nil {
+			explicitEnum, err := value.GetEnum()
 			if err != nil {
 				return nil, err
 			}
 
-			typ = []string{flaten([]string{current, pascalCaseKey})}
-			enumType := flaten([]string{"$", current, pascalCaseKey})
-			if _, ok := out[enumType]; !ok {
-				out[enumType] = make(map[string]string)
-			}
-			for _, value := range enum {
-				val := fmt.Sprintf("%v", value)
-				out[enumType][flaten([]string{current, pascalCaseKey, val})] = val
+			constructedTypeName := flaten(currentIdentSlice)
+			constructedType = []string{constructedTypeName}
+			enumType := flaten([]string{"$", constructedTypeName})
+			out[enumType] = make(map[string]string)
+
+			for _, value := range explicitEnum {
+				enumValue := fmt.Sprintf("%v", value)
+				out[enumType][flaten(append(currentIdentSlice, enumValue))] = enumValue
 			}
 		}
 
-		required, err := value.GetRequiredOrFalse()
+		explicitRequired, err := value.GetRequiredOrFalse()
 		if err != nil {
 			return nil, err
 		}
-		if slices.Contains(requiredList, key) {
-			required = true
+		if slices.Contains(requiredList, explicitKey) {
+			explicitRequired = true
 		}
-		goType, err := GetGoType(typ, typeName, WithRequired(required && !forceOptional))
+		goType, err := GetGoType(constructedType, typeName, WithRequired(explicitRequired && !forceOptional))
 		if err != nil {
 			return nil, err
 		}
-		if _, ok := out[current]; !ok {
-			out[current] = make(map[string]string)
-		}
-		out[current][pascalCaseKey] = goType
+		out[parentIdentKey][identKey] = goType
 	}
 
 	if oneOfs != nil {
@@ -146,52 +147,68 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 }
 
 func ToGoArrayType(dim int, key string, value codegen.TypedParam, parents []string) (Types, error) {
-	out := make(Types)
-	current := flaten(parents)
+	if strings.TrimSpace(key) == EmptyString {
+		return nil, fmt.Errorf("array definition requires a key")
+	}
+
 	innerSchema, err := value.GetSchema()
 	if err != nil {
 		return nil, err
 	}
+
+	if innerSchema == nil {
+		return nil, nil
+	}
+
 	items, err := innerSchema.GetItemsAsArray()
 	if err != nil {
 		return nil, err
 	}
 
-	if _, ok := out[current]; !ok {
-		out[current] = make(map[string]string)
+	if len(items) == 0 {
+		return nil, fmt.Errorf("expected at least one type but found zero")
 	}
 
+	identKey := key
+	parentIdentKey := flaten(parents)
+	currentIdentSlice := append(parents, identKey)
+
+	out := make(Types)
+	out[parentIdentKey] = make(map[string]string)
+
 	if len(items) > 1 {
-		out[current][key] = "[]any"
+		out[parentIdentKey][identKey] = "[]any"
 		return out, nil
 	}
 
-	if items[0].IsObject() {
-		res, err := ToGoTypeModel(items[0], append(parents, key), false)
+	currentType := items[0]
+
+	if currentType.IsObject() {
+		res, err := ToGoTypeModel(items[0], currentIdentSlice, false)
 		if err != nil {
 			return nil, err
 		}
 		deepCopy(out, res)
 	}
 
-	if items[0].IsArray() {
-		res, err := ToGoArrayType(dim+1, key, items[0], parents)
+	if currentType.IsArray() {
+		res, err := ToGoArrayType(dim+1, identKey, items[0], parents)
 		if err != nil {
 			return nil, err
 		}
 		return res, nil
 	}
 
-	typ, err := items[0].GetType()
+	explicitType, err := currentType.GetType()
 	if err != nil {
 		return nil, err
 	}
 
-	finalType, err := GetGoType(typ, flaten(append(parents, key)))
+	goType, err := GetGoType(explicitType, flaten(currentIdentSlice))
 	if err != nil {
 		return nil, err
 	}
-	out[current][key] = fmt.Sprintf("%s%s", strings.Repeat("[]", dim), finalType)
+	out[parentIdentKey][identKey] = fmt.Sprintf("%s%s", strings.Repeat("[]", dim), goType)
 	return out, nil
 }
 
@@ -264,7 +281,7 @@ func ToGoCombinatorType(key string, value codegen.TypedParam, parents []string) 
 		}
 
 		if spec.IsObject() {
-			res, err := ToGoTypeModel(spec, innerIdentSlice, hasInnerIdentKey)
+			res, err := ToGoTypeModel(spec, innerIdentSlice, !hasInnerIdentKey)
 			if err != nil {
 				return nil, err
 			}
@@ -358,12 +375,11 @@ func deepCopy(dest Types, src Types) {
 	}
 }
 
-func flaten[T any](in []T) string {
+func flaten(in []string) string {
 	out := bytes.NewBufferString("")
 
 	for _, value := range in {
-		fmt.Fprintf(out, "%v", value)
-
+		out.WriteString(value)
 	}
 
 	return out.String()

@@ -7,11 +7,11 @@
 		"Address": "*ExportAddress",
 		"Details": "ExportDetails",
 		"FirstName": "*string",
-		"Hobbie": "string",
+		"Hobbie": "*string",
 		"Hobbie2": "*string",
 		"LastName": "*string",
 		"Products": "[]ExportProducts",
-		"Skills": "string",
+		"Skills": "*string",
 		"Subscription": "*ExportSubscription"
 	},
 	"ExportAddress": {
@@ -19,14 +19,14 @@
 		"Street": "*string"
 	},
 	"ExportDetails": {
-		"CustomerName": "string",
-		"Email": "string",
+		"CustomerName": "*string",
+		"Email": "*string",
 		"Legal": "*ExportDetailsLegal"
 	},
 	"ExportDetailsLegal": {
-		"CompanyName": "*string",
+		"CompanyName": "string",
 		"InnerField": "*ExportDetailsLegalInnerField",
-		"TaxId": "*string"
+		"TaxId": "string"
 	},
 	"ExportDetailsLegalInnerField": {
 		"Id": "*int"
