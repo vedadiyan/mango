@@ -136,7 +136,7 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 	}
 
 	if rootOneOfs != nil {
-		res, err := ToGoCombinatorType("", *rootOneOfs, parents)
+		res, err := ToGoCombinatorType(EmptyString, *rootOneOfs, parents)
 		if err != nil {
 			return nil, err
 		}
