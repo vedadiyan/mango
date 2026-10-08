@@ -75,7 +75,7 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 			if err != nil {
 				return nil, err
 			}
-			copyGoTypes(out, res)
+			deepCopy(out, res)
 			continue
 		}
 		if value.IsCombinator() {
@@ -83,7 +83,7 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 			if err != nil {
 				return nil, err
 			}
-			copyGoTypes(out, res)
+			deepCopy(out, res)
 			continue
 		}
 		if value.IsObject() {
@@ -91,7 +91,7 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 			if err != nil {
 				return nil, err
 			}
-			copyGoTypes(out, res)
+			deepCopy(out, res)
 			typeName = flaten(append(parents, pascalCaseKey))
 		}
 
@@ -139,7 +139,7 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 		if err != nil {
 			return nil, err
 		}
-		copyGoTypes(out, res)
+		deepCopy(out, res)
 	}
 
 	return out, nil
@@ -171,7 +171,7 @@ func ToGoArrayType(dim int, key string, value codegen.TypedParam, parents []stri
 		if err != nil {
 			return nil, err
 		}
-		copyGoTypes(out, res)
+		deepCopy(out, res)
 	}
 
 	if items[0].IsArray() {
@@ -259,7 +259,7 @@ func ToGoCombinatorType(key string, value codegen.TypedParam, parents []string) 
 			if err != nil {
 				return nil, err
 			}
-			copyGoTypes(out, res)
+			deepCopy(out, res)
 			continue
 		}
 
@@ -268,7 +268,7 @@ func ToGoCombinatorType(key string, value codegen.TypedParam, parents []string) 
 			if err != nil {
 				return nil, err
 			}
-			copyGoTypes(out, res)
+			deepCopy(out, res)
 		}
 
 		if innerIdentKey == EmptyString {
@@ -348,7 +348,7 @@ func GetGoType(in []string, name string, opts ...GoTypeOption) (string, error) {
 	return fmt.Sprintf("%s%s", options.optional, typ), nil
 }
 
-func copyGoTypes(dest Types, src Types) {
+func deepCopy(dest Types, src Types) {
 	for key, value := range src {
 		if _, ok := dest[key]; !ok {
 			dest[key] = value
