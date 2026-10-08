@@ -50,6 +50,8 @@ type (
 		Description string
 		Specs       T
 		Index       Index
+
+		ObjectName string
 	}
 
 	Array[T Positional | Composite | Scalar] struct {

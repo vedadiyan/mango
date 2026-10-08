@@ -43,7 +43,6 @@ func DefineExport() static.Schema {
 			"details": static.Combinator[static.OneOf]{
 				Specs: static.OneOf{
 					static.Composite{
-						ObjectName: "individual",
 						Properties: static.Properties{
 							"customer_name": static.Scalar{
 								Type:     static.BasicTypes{static.TypeString},

@@ -37,7 +37,7 @@ const (
 	CombinatorTypeNot     CombinatorType = "Not"
 )
 
-func GetGoTypes(in codegen.TypedParam, parents []string) (Types, error) {
+func GetGoTypes(in codegen.TypedParam, parents []string, forceOptional bool) (Types, error) {
 	schema, err := in.GetSchema()
 	if err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func GetGoTypes(in codegen.TypedParam, parents []string) (Types, error) {
 			continue
 		}
 		if value.IsObject() {
-			res, err := GetGoTypes(value, append(parents, pascalCaseKey))
+			res, err := GetGoTypes(value, append(parents, pascalCaseKey), forceOptional)
 			if err != nil {
 				return nil, err
 			}
@@ -122,7 +122,7 @@ func GetGoTypes(in codegen.TypedParam, parents []string) (Types, error) {
 		if slices.Contains(requiredList, key) {
 			required = true
 		}
-		goType, err := GetGoType(typ, typeName, WithRequired(required))
+		goType, err := GetGoType(typ, typeName, WithRequired(required && !forceOptional))
 		if err != nil {
 			return nil, err
 		}
@@ -132,9 +132,8 @@ func GetGoTypes(in codegen.TypedParam, parents []string) (Types, error) {
 		out[current][pascalCaseKey] = goType
 	}
 
-	l := len(parents)
 	if oneOfs != nil {
-		res, err := GetGoCombinatorType(parents[l-1], *oneOfs, parents[:l-1])
+		res, err := GetGoCombinatorType("", *oneOfs, parents)
 		if err != nil {
 			return nil, err
 		}
@@ -166,7 +165,7 @@ func GetGoArrayType(dim int, key string, value codegen.TypedParam, parents []str
 	}
 
 	if items[0].IsObject() {
-		res, err := GetGoTypes(items[0], append(parents, key))
+		res, err := GetGoTypes(items[0], append(parents, key), false)
 		if err != nil {
 			return nil, err
 		}
@@ -225,12 +224,12 @@ func GetGoCombinatorType(key string, value codegen.TypedParam, parents []string)
 	combinatorKey := flaten(append(parents, typeName))
 	out[combinatorKey] = make(map[string]string)
 
-	for i, spec := range specs {
+	for _, spec := range specs {
 		typ, err := spec.GetType()
 		if err != nil {
 			return nil, err
 		}
-		combinatorName := fmt.Sprintf("%sVariation%d", key, i)
+		combinatorName := ""
 		innerSchema, err := spec.GetSchema()
 		if err != nil {
 			return nil, nil
@@ -256,11 +255,15 @@ func GetGoCombinatorType(key string, value codegen.TypedParam, parents []string)
 			continue
 		}
 		if spec.IsObject() {
-			res, err := GetGoTypes(spec, append(parents, typeName, combinatorName))
+			res, err := GetGoTypes(spec, append(parents, typeName, combinatorName), len(combinatorName) == 0)
 			if err != nil {
 				return nil, err
 			}
 			copyGoTypes(out, res)
+		}
+
+		if len(combinatorName) == 0 {
+			continue
 		}
 
 		required, err := spec.GetRequiredOrFalse()
@@ -274,9 +277,12 @@ func GetGoCombinatorType(key string, value codegen.TypedParam, parents []string)
 		}
 		out[combinatorKey][combinatorName] = finalType
 	}
-	if len(key) != 0 {
-		out[current][key] = combinatorKey
+	if len(key) == 0 {
+		out[current] = out[combinatorKey]
+		delete(out, combinatorKey)
+		return out, nil
 	}
+	out[current][key] = combinatorKey
 	return out, nil
 }
 
