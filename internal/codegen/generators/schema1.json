@@ -5,27 +5,27 @@
 	},
 	"Export": {
 		"Address": "*ExportAddress",
-		"Details": "ExportDetails",
+		"Details": "ExportOneOfDetails",
 		"FirstName": "*string",
-		"Hobbie": "string",
+		"Hobbie": "*string",
 		"Hobbie2": "*string",
 		"LastName": "*string",
 		"Products": "[]ExportProducts",
-		"Skills": "string",
+		"Skills": "*string",
 		"Subscription": "*ExportSubscription"
 	},
 	"ExportAddress": {
 		"PostalCode": "*string",
 		"Street": "*string"
 	},
-	"ExportDetails": {
-		"CustomerName": "string",
-		"Email": "string",
-		"Legal": "*ExportDetailsLegal"
+	"ExportOneOfDetails": {
+		"CustomerName": "*string",
+		"Email": "*string",
+		"Legal": "*ExportOneOfDetailsLegal"
 	},
-	"ExportDetailsLegal": {
-		"CompanyName": "*string",
-		"TaxId": "*string"
+	"ExportOneOfDetailsLegal": {
+		"CompanyName": "string",
+		"TaxId": "string"
 	},
 	"ExportProducts": {
 		"Id": "*int",

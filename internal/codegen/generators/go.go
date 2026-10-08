@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/iancoleman/strcase"
 	"github.com/vedadiyan/mango/internal/codegen"
 )
@@ -28,7 +29,8 @@ type (
 )
 
 const (
-	EmptyString = ""
+	EmptyString   = ""
+	ZeroDimension = 0
 
 	CombinatorTypeInavlid CombinatorType = "Invalid"
 	CombinatorTypeOneOf   CombinatorType = "OneOf"
@@ -193,11 +195,12 @@ func ToGoArrayType(dim int, key string, value codegen.TypedParam, parents []stri
 	return out, nil
 }
 
-func ToGoCombinatorType(key string, value codegen.TypedParam, parents []string) (Types, error) {
+func ToGoCombinatorType_______(key string, value codegen.TypedParam, parents []string) (Types, error) {
 	combinatorType, ok := GetCombinatorType(value.TypeName)
 	if !ok {
 		return nil, fmt.Errorf("invalid combinator")
 	}
+	_ = combinatorType
 
 	out := make(Types)
 	current := key
@@ -220,7 +223,10 @@ func ToGoCombinatorType(key string, value codegen.TypedParam, parents []string) 
 	if err != nil {
 		return nil, err
 	}
-	typeName := fmt.Sprintf("%s%s", combinatorType, key)
+	typeName := key
+	if key == "" {
+		typeName = uuid.New().String()
+	}
 	combinatorKey := flaten(append(parents, typeName))
 	out[combinatorKey] = make(map[string]string)
 
@@ -283,6 +289,110 @@ func ToGoCombinatorType(key string, value codegen.TypedParam, parents []string) 
 		return out, nil
 	}
 	out[current][key] = combinatorKey
+	return out, nil
+}
+
+func ToGoCombinatorType(key string, value codegen.TypedParam, parents []string) (Types, error) {
+	schema, err := value.GetSchema()
+	if err != nil {
+		return nil, err
+	}
+	if schema == nil {
+		return nil, nil
+	}
+
+	specs, err := schema.GetSpecs()
+	if err != nil {
+		return nil, err
+	}
+
+	identKey := key
+	isDynamicIdent := false
+	if strings.TrimSpace(key) == EmptyString {
+		identKey = uuid.NewString()
+		isDynamicIdent = true
+	}
+
+	parentIdentKey := identKey
+	if len(parents) > 0 {
+		parentIdentKey = flaten(parents)
+	}
+
+	currentIdentSlice := append(parents, identKey)
+	currentIdentKey := flaten(append(parents, identKey))
+
+	out := make(Types)
+	out[parentIdentKey] = make(map[string]string)
+	out[currentIdentKey] = make(map[string]string)
+
+	for _, spec := range specs {
+		innerIdentKey := ""
+		hasInnerIdentKey := false
+
+		innerSchema, err := spec.GetSchema()
+		if err != nil {
+			return nil, nil
+		}
+
+		if innerSchema == nil {
+			continue
+		}
+
+		objectName, err := innerSchema.GetObjectName()
+		if err != nil {
+			return nil, err
+		}
+
+		if objectName != nil {
+			innerIdentKey = MakePascalCase(*objectName)
+			hasInnerIdentKey = true
+		}
+
+		innerIdentSlice := append(currentIdentSlice, innerIdentKey)
+
+		if spec.IsArray() {
+			res, err := ToGoArrayType(ZeroDimension, innerIdentKey, spec, currentIdentSlice)
+			if err != nil {
+				return nil, err
+			}
+			copyGoTypes(out, res)
+			continue
+		}
+
+		if spec.IsObject() {
+			res, err := ToGoTypeModel(spec, innerIdentSlice, hasInnerIdentKey)
+			if err != nil {
+				return nil, err
+			}
+			copyGoTypes(out, res)
+		}
+
+		if innerIdentKey == EmptyString {
+			continue
+		}
+
+		typ, err := spec.GetType()
+		if err != nil {
+			return nil, err
+		}
+		required, err := spec.GetRequiredOrFalse()
+		if err != nil {
+			return nil, err
+		}
+		finalType, err := GetGoType(typ, flaten(innerIdentSlice), WithRequired(required))
+		if err != nil {
+			return nil, err
+		}
+		out[currentIdentKey][innerIdentKey] = finalType
+	}
+
+	if !isDynamicIdent {
+		out[parentIdentKey][key] = currentIdentKey
+		return out, nil
+	}
+
+	out[parentIdentKey] = out[currentIdentKey]
+	delete(out, currentIdentKey)
 	return out, nil
 }
 
