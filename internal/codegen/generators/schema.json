@@ -1,38 +1,161 @@
 {
-	"$ExportSubscription": {
-		"ExportSubscriptionAdvanced": "Advanced",
-		"ExportSubscriptionNormal": "Normal"
+	"title": "Test Title",
+	"description": "Test Description",
+	"properties": {
+		"address": {
+			"bsonType": [
+				"object"
+			],
+			"properties": {
+				"postal_code": {
+					"bsonType": [
+						"string"
+					]
+				},
+				"street": {
+					"bsonType": [
+						"string"
+					]
+				}
+			}
+		},
+		"details": {
+			"oneOf": [
+				{
+					"bsonType": [
+						"object"
+					],
+					"properties": {
+						"customer_name": {
+							"bsonType": [
+								"string"
+							]
+						},
+						"email": {
+							"bsonType": [
+								"string"
+							]
+						}
+					},
+					"required": [
+						"customer_name",
+						"email"
+					]
+				},
+				{
+					"bsonType": [
+						"object"
+					],
+					"properties": {
+						"company_name": {
+							"bsonType": [
+								"string"
+							]
+						},
+						"inner_field": {
+							"bsonType": [
+								"object"
+							],
+							"properties": {
+								"id": {
+									"bsonType": [
+										"int"
+									]
+								}
+							}
+						},
+						"tax_id": {
+							"bsonType": [
+								"string"
+							]
+						}
+					},
+					"required": [
+						"tax_id",
+						"company_name"
+					]
+				}
+			]
+		},
+		"first_name": {
+			"bsonType": [
+				"string"
+			]
+		},
+		"last_name": {
+			"bsonType": [
+				"string"
+			]
+		},
+		"products": {
+			"bsonType": [
+				"array"
+			],
+			"items": {
+				"bsonType": [
+					"object"
+				],
+				"properties": {
+					"id": {
+						"bsonType": [
+							"int"
+						]
+					},
+					"name": {
+						"bsonType": [
+							"string"
+						]
+					}
+				}
+			}
+		},
+		"subscription": {
+			"enum": [
+				"Normal",
+				"Advanced"
+			]
+		}
 	},
-	"Export": {
-		"Address": "*ExportAddress",
-		"Details": "ExportDetails",
-		"FirstName": "*string",
-		"Hobbie": "*string",
-		"Hobbie2": "*string",
-		"LastName": "*string",
-		"Products": "[]ExportProducts",
-		"Skills": "*string",
-		"Subscription": "*ExportSubscription"
-	},
-	"ExportAddress": {
-		"PostalCode": "*string",
-		"Street": "*string"
-	},
-	"ExportDetails": {
-		"CustomerName": "*string",
-		"Email": "*string",
-		"Legal": "*ExportDetailsLegal"
-	},
-	"ExportDetailsLegal": {
-		"CompanyName": "string",
-		"InnerField": "*ExportDetailsLegalInnerField",
-		"TaxId": "string"
-	},
-	"ExportDetailsLegalInnerField": {
-		"Id": "*int"
-	},
-	"ExportProducts": {
-		"Id": "*int",
-		"Name": "*string"
+	"oneOf": [
+		{
+			"bsonType": [
+				"object"
+			],
+			"properties": {
+				"hobbie": {
+					"bsonType": [
+						"string"
+					]
+				},
+				"hobbie2": {
+					"bsonType": [
+						"string"
+					]
+				}
+			},
+			"required": [
+				"hobbie"
+			]
+		},
+		{
+			"bsonType": [
+				"object"
+			],
+			"properties": {
+				"skills": {
+					"bsonType": [
+						"string"
+					]
+				}
+			},
+			"required": [
+				"skills"
+			]
+		}
+	],
+	"not": {
+		"required": [
+			"new_field"
+		]
 	}
 }

@@ -22,7 +22,7 @@ func TestRead(t *testing.T) {
 	}
 	schemas, err := codegen.GetSchemas(pc)
 	for _, i := range schemas {
-		value, err := ToGoTypeModel(i.TypedParam, []string{i.Name}, false)
+		value, err := ToBsonSchema(i.TypedParam)
 		if err != nil {
 			t.FailNow()
 		}

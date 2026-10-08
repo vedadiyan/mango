@@ -100,6 +100,13 @@ func DefineExport() static.Schema {
 				},
 			},
 		},
+		Not: static.Combinator[static.Not]{
+			Specs: static.Not{
+				{
+					Required: []string{"new_field"},
+				},
+			},
+		},
 		Conditions: static.Conditions{
 			{"$exists": static.Condition{
 				"X": static.Condition{

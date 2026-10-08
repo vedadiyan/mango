@@ -54,7 +54,7 @@ type (
 		ObjectName string
 	}
 
-	Array[T Positional | Composite | Scalar] struct {
+	Array[T Composite | Scalar] struct {
 		Items           T
 		MinItems        int
 		MaxItems        int
@@ -65,12 +65,14 @@ type (
 		ObjectName string
 	}
 
-	Positional Items
+	NotCondition struct {
+		Required []string
+	}
 
 	OneOf Items
 	AnyOf Items
 	AllOf Items
-	Not   [1]Type
+	Not   [1]NotCondition
 
 	Schema struct {
 		Title        string

@@ -47,7 +47,7 @@ type (
 		AnyOf []*BsonSchema `json:"anyOf,omitempty"`
 		OneOf []*BsonSchema `json:"oneOf,omitempty"`
 		AllOf []*BsonSchema `json:"allOf,omitempty"`
-		Not   *BsonSchema   `json:"Not,omitempty"`
+		Not   *BsonSchema   `json:"not,omitempty"`
 
 		index Index
 
@@ -169,12 +169,10 @@ func ToBsonSchema(in codegen.TypedParam) (*BsonSchema, error) {
 	if err != nil {
 		return nil, err
 	}
-	oneOfs, err := in.GetOneOfs()
+	rootCombinators, err := in.GetRootCombinators()
 	if err != nil {
 		return nil, err
 	}
-
-	_ = oneOfs
 
 	out.Title = title
 	out.Description = description
@@ -204,8 +202,8 @@ func ToBsonSchema(in codegen.TypedParam) (*BsonSchema, error) {
 	}
 	out.Required = append(out.Required, required...)
 
-	if oneOfs != nil {
-		bsonSchema, err := ToBsonSchema(*oneOfs)
+	for _, rootCombinator := range rootCombinators {
+		bsonSchema, err := ToBsonSchema(rootCombinator)
 		if err != nil {
 			return nil, err
 		}
@@ -214,6 +212,9 @@ func ToBsonSchema(in codegen.TypedParam) (*BsonSchema, error) {
 		// 	items = append(items, oneOf)
 		// }
 		out.OneOf = append(out.OneOf, bsonSchema.OneOf...)
+		out.AnyOf = append(out.AnyOf, bsonSchema.AnyOf...)
+		out.AllOf = append(out.AllOf, bsonSchema.AllOf...)
+		out.Not = bsonSchema.Not
 	}
 
 	switch firstOrDefault(typ) {
