@@ -596,7 +596,89 @@ func (r TypedParam) GetOneOfs() (*TypedParam, error) {
 		return nil, err
 	}
 	return oneOfs, nil
+}
 
+func (r TypedParam) GetAnyOfs() (*TypedParam, error) {
+	rawSchema, err := r.GetSchema()
+	if err != nil {
+		return nil, err
+	}
+	if rawSchema == nil {
+		return nil, nil
+	}
+	oneOfs, err := rawSchema.LookupCast[TypedParam]("AnyOf")
+	if err != nil {
+		return nil, err
+	}
+	return oneOfs, nil
+}
+
+func (r TypedParam) GetAllOfs() (*TypedParam, error) {
+	rawSchema, err := r.GetSchema()
+	if err != nil {
+		return nil, err
+	}
+	if rawSchema == nil {
+		return nil, nil
+	}
+	oneOfs, err := rawSchema.LookupCast[TypedParam]("AllOf")
+	if err != nil {
+		return nil, err
+	}
+	return oneOfs, nil
+}
+
+func (r TypedParam) GetNots() (*TypedParam, error) {
+	rawSchema, err := r.GetSchema()
+	if err != nil {
+		return nil, err
+	}
+	if rawSchema == nil {
+		return nil, nil
+	}
+	oneOfs, err := rawSchema.LookupCast[TypedParam]("Not")
+	if err != nil {
+		return nil, err
+	}
+	return oneOfs, nil
+}
+
+func (r TypedParam) GetRootCombinators() ([]TypedParam, error) {
+	out := make([]TypedParam, 0)
+
+	if v, err := r.GetOneOfs(); err == nil {
+		if v != nil {
+			out = append(out, *v)
+		}
+	} else {
+		return nil, err
+	}
+
+	if v, err := r.GetAnyOfs(); err == nil {
+		if v != nil {
+			out = append(out, *v)
+		}
+	} else {
+		return nil, err
+	}
+
+	if v, err := r.GetAllOfs(); err == nil {
+		if v != nil {
+			out = append(out, *v)
+		}
+	} else {
+		return nil, err
+	}
+
+	if v, err := r.GetNots(); err == nil {
+		if v != nil {
+			out = append(out, *v)
+		}
+	} else {
+		return nil, err
+	}
+
+	return out, nil
 }
 
 func (r RawSchema) GetProperties() (Properties, error) {

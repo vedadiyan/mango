@@ -54,7 +54,7 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 		return nil, err
 	}
 
-	rootOneOfs, err := in.GetOneOfs()
+	rootCombinators, err := in.GetRootCombinators()
 	if err != nil {
 		return nil, err
 	}
@@ -135,8 +135,8 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 		out[parentIdentKey][identKey] = goType
 	}
 
-	if rootOneOfs != nil {
-		res, err := ToGoCombinatorType(EmptyString, *rootOneOfs, parents)
+	for _, rootCombinator := range rootCombinators {
+		res, err := ToGoCombinatorType(EmptyString, rootCombinator, parents)
 		if err != nil {
 			return nil, err
 		}
