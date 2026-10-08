@@ -37,7 +37,7 @@ const (
 	CombinatorTypeNot     CombinatorType = "Not"
 )
 
-func GetGoTypes(in codegen.TypedParam, parents []string, forceOptional bool) (Types, error) {
+func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) (Types, error) {
 	schema, err := in.GetSchema()
 	if err != nil {
 		return nil, err
@@ -69,7 +69,7 @@ func GetGoTypes(in codegen.TypedParam, parents []string, forceOptional bool) (Ty
 		pascalCaseKey := MakePascalCase(key)
 		typeName := pascalCaseKey
 		if value.IsArray() {
-			res, err := GetGoArrayType(1, pascalCaseKey, value, parents)
+			res, err := ToGoArrayType(1, pascalCaseKey, value, parents)
 			if err != nil {
 				return nil, err
 			}
@@ -77,7 +77,7 @@ func GetGoTypes(in codegen.TypedParam, parents []string, forceOptional bool) (Ty
 			continue
 		}
 		if value.IsCombinator() {
-			res, err := GetGoCombinatorType(pascalCaseKey, value, parents)
+			res, err := ToGoCombinatorType(pascalCaseKey, value, parents)
 			if err != nil {
 				return nil, err
 			}
@@ -85,7 +85,7 @@ func GetGoTypes(in codegen.TypedParam, parents []string, forceOptional bool) (Ty
 			continue
 		}
 		if value.IsObject() {
-			res, err := GetGoTypes(value, append(parents, pascalCaseKey), forceOptional)
+			res, err := ToGoTypeModel(value, append(parents, pascalCaseKey), forceOptional)
 			if err != nil {
 				return nil, err
 			}
@@ -133,7 +133,7 @@ func GetGoTypes(in codegen.TypedParam, parents []string, forceOptional bool) (Ty
 	}
 
 	if oneOfs != nil {
-		res, err := GetGoCombinatorType("", *oneOfs, parents)
+		res, err := ToGoCombinatorType("", *oneOfs, parents)
 		if err != nil {
 			return nil, err
 		}
@@ -143,7 +143,7 @@ func GetGoTypes(in codegen.TypedParam, parents []string, forceOptional bool) (Ty
 	return out, nil
 }
 
-func GetGoArrayType(dim int, key string, value codegen.TypedParam, parents []string) (Types, error) {
+func ToGoArrayType(dim int, key string, value codegen.TypedParam, parents []string) (Types, error) {
 	out := make(Types)
 	current := flaten(parents)
 	innerSchema, err := value.GetSchema()
@@ -165,7 +165,7 @@ func GetGoArrayType(dim int, key string, value codegen.TypedParam, parents []str
 	}
 
 	if items[0].IsObject() {
-		res, err := GetGoTypes(items[0], append(parents, key), false)
+		res, err := ToGoTypeModel(items[0], append(parents, key), false)
 		if err != nil {
 			return nil, err
 		}
@@ -173,7 +173,7 @@ func GetGoArrayType(dim int, key string, value codegen.TypedParam, parents []str
 	}
 
 	if items[0].IsArray() {
-		res, err := GetGoArrayType(dim+1, key, items[0], parents)
+		res, err := ToGoArrayType(dim+1, key, items[0], parents)
 		if err != nil {
 			return nil, err
 		}
@@ -193,7 +193,7 @@ func GetGoArrayType(dim int, key string, value codegen.TypedParam, parents []str
 	return out, nil
 }
 
-func GetGoCombinatorType(key string, value codegen.TypedParam, parents []string) (Types, error) {
+func ToGoCombinatorType(key string, value codegen.TypedParam, parents []string) (Types, error) {
 	combinatorType, ok := GetCombinatorType(value.TypeName)
 	if !ok {
 		return nil, fmt.Errorf("invalid combinator")
@@ -247,7 +247,7 @@ func GetGoCombinatorType(key string, value codegen.TypedParam, parents []string)
 		flattenedKey := flaten(append(parents, typeName, combinatorName))
 
 		if spec.IsArray() {
-			res, err := GetGoArrayType(0, combinatorName, spec, append(parents, typeName))
+			res, err := ToGoArrayType(0, combinatorName, spec, append(parents, typeName))
 			if err != nil {
 				return nil, err
 			}
@@ -255,7 +255,7 @@ func GetGoCombinatorType(key string, value codegen.TypedParam, parents []string)
 			continue
 		}
 		if spec.IsObject() {
-			res, err := GetGoTypes(spec, append(parents, typeName, combinatorName), len(combinatorName) == 0)
+			res, err := ToGoTypeModel(spec, append(parents, typeName, combinatorName), len(combinatorName) == 0)
 			if err != nil {
 				return nil, err
 			}
