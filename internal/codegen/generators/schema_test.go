@@ -97,6 +97,33 @@ func DefineExport() static.Schema {
 							Required: true,
 						},
 					},
+					OneOf: static.Combinator[static.OneOf]{
+						Specs: static.OneOf{
+							static.Composite{
+								Properties: static.Properties{
+									"role": static.Scalar{
+										Type:     static.BasicTypes{static.TypeString},
+										Required: true,
+									},
+								},
+							},
+							static.Composite{
+								Properties: static.Properties{
+									"responsibility": static.Scalar{
+										Type:     static.BasicTypes{static.TypeString},
+										Required: true,
+									},
+								},
+							},
+						},
+					},
+					Not: static.Combinator[static.Not]{
+						Specs: static.Not{
+							{
+								Required: []string{"experience"},
+							},
+						},
+					},
 				},
 			},
 		},

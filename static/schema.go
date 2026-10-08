@@ -42,6 +42,11 @@ type (
 		AdditionalProperties bool
 		Index                Index
 
+		OneOf Combinator[OneOf]
+		AnyOf Combinator[AnyOf]
+		AllOf Combinator[AllOf]
+		Not   Combinator[Not]
+
 		ObjectName string
 	}
 
