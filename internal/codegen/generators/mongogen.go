@@ -207,10 +207,6 @@ func ToBsonSchema(in codegen.TypedParam) (*BsonSchema, error) {
 		if err != nil {
 			return nil, err
 		}
-		// for _, oneOf := range bsonSchema.OneOf {
-		// 	oneOf.Required = append(oneOf.Required, bsonSchema.Required...)
-		// 	items = append(items, oneOf)
-		// }
 		out.OneOf = append(out.OneOf, bsonSchema.OneOf...)
 		out.AnyOf = append(out.AnyOf, bsonSchema.AnyOf...)
 		out.AllOf = append(out.AllOf, bsonSchema.AllOf...)
