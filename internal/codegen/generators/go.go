@@ -195,108 +195,12 @@ func ToGoArrayType(dim int, key string, value codegen.TypedParam, parents []stri
 	return out, nil
 }
 
-func ToGoCombinatorType_______(key string, value codegen.TypedParam, parents []string) (Types, error) {
-	combinatorType, ok := GetCombinatorType(value.TypeName)
-	if !ok {
-		return nil, fmt.Errorf("invalid combinator")
-	}
-	_ = combinatorType
-
-	out := make(Types)
-	current := key
-	if len(parents) > 0 {
-		current = flaten(parents)
-	}
-	schema, err := value.GetSchema()
-	if err != nil {
-		return nil, err
-	}
-	if schema == nil {
-		return nil, nil
-	}
-
-	if _, ok := out[current]; !ok {
-		out[current] = make(map[string]string)
-	}
-
-	specs, err := schema.GetSpecs()
-	if err != nil {
-		return nil, err
-	}
-	typeName := key
-	if key == "" {
-		typeName = uuid.New().String()
-	}
-	combinatorKey := flaten(append(parents, typeName))
-	out[combinatorKey] = make(map[string]string)
-
-	for _, spec := range specs {
-		typ, err := spec.GetType()
-		if err != nil {
-			return nil, err
-		}
-		combinatorName := ""
-		innerSchema, err := spec.GetSchema()
-		if err != nil {
-			return nil, nil
-		}
-		if innerSchema == nil {
-			continue
-		}
-		objectName, err := innerSchema.GetObjectName()
-		if err != nil {
-			return nil, err
-		}
-		if objectName != nil {
-			combinatorName = MakePascalCase(*objectName)
-		}
-		flattenedKey := flaten(append(parents, typeName, combinatorName))
-
-		if spec.IsArray() {
-			res, err := ToGoArrayType(0, combinatorName, spec, append(parents, typeName))
-			if err != nil {
-				return nil, err
-			}
-			copyGoTypes(out, res)
-			continue
-		}
-		if spec.IsObject() {
-			res, err := ToGoTypeModel(spec, append(parents, typeName, combinatorName), len(combinatorName) == 0)
-			if err != nil {
-				return nil, err
-			}
-			copyGoTypes(out, res)
-		}
-
-		if len(combinatorName) == 0 {
-			continue
-		}
-
-		required, err := spec.GetRequiredOrFalse()
-		if err != nil {
-			return nil, err
-		}
-
-		finalType, err := GetGoType(typ, flattenedKey, WithRequired(required))
-		if err != nil {
-			return nil, err
-		}
-		out[combinatorKey][combinatorName] = finalType
-	}
-	if len(key) == 0 {
-		out[current] = out[combinatorKey]
-		delete(out, combinatorKey)
-		return out, nil
-	}
-	out[current][key] = combinatorKey
-	return out, nil
-}
-
 func ToGoCombinatorType(key string, value codegen.TypedParam, parents []string) (Types, error) {
 	schema, err := value.GetSchema()
 	if err != nil {
 		return nil, err
 	}
+
 	if schema == nil {
 		return nil, nil
 	}
@@ -326,9 +230,6 @@ func ToGoCombinatorType(key string, value codegen.TypedParam, parents []string) 
 	out[currentIdentKey] = make(map[string]string)
 
 	for _, spec := range specs {
-		innerIdentKey := ""
-		hasInnerIdentKey := false
-
 		innerSchema, err := spec.GetSchema()
 		if err != nil {
 			return nil, nil
@@ -338,13 +239,16 @@ func ToGoCombinatorType(key string, value codegen.TypedParam, parents []string) 
 			continue
 		}
 
-		objectName, err := innerSchema.GetObjectName()
+		explicitObjectName, err := innerSchema.GetObjectName()
 		if err != nil {
 			return nil, err
 		}
 
-		if objectName != nil {
-			innerIdentKey = MakePascalCase(*objectName)
+		innerIdentKey := ""
+		hasInnerIdentKey := false
+
+		if explicitObjectName != nil {
+			innerIdentKey = MakePascalCase(*explicitObjectName)
 			hasInnerIdentKey = true
 		}
 
@@ -371,19 +275,19 @@ func ToGoCombinatorType(key string, value codegen.TypedParam, parents []string) 
 			continue
 		}
 
-		typ, err := spec.GetType()
+		explicitType, err := spec.GetType()
 		if err != nil {
 			return nil, err
 		}
-		required, err := spec.GetRequiredOrFalse()
+		explicitRequired, err := spec.GetRequiredOrFalse()
 		if err != nil {
 			return nil, err
 		}
-		finalType, err := GetGoType(typ, flaten(innerIdentSlice), WithRequired(required))
+		goType, err := GetGoType(explicitType, flaten(innerIdentSlice), WithRequired(explicitRequired))
 		if err != nil {
 			return nil, err
 		}
-		out[currentIdentKey][innerIdentKey] = finalType
+		out[currentIdentKey][innerIdentKey] = goType
 	}
 
 	if !isDynamicIdent {
