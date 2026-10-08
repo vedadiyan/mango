@@ -65,6 +65,13 @@ func DefineExport() static.Schema {
 								Type:     static.BasicTypes{static.TypeString},
 								Required: true,
 							},
+							"inner_field": static.Composite{
+								Properties: static.Properties{
+									"id": static.Scalar{
+										Type: static.BasicTypes{static.TypeInt},
+									},
+								},
+							},
 						},
 					},
 				},

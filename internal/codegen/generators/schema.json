@@ -25,7 +25,11 @@
 	},
 	"ExportDetailsLegal": {
 		"CompanyName": "*string",
+		"InnerField": "*ExportDetailsLegalInnerField",
 		"TaxId": "*string"
+	},
+	"ExportDetailsLegalInnerField": {
+		"Id": "*int"
 	},
 	"ExportProducts": {
 		"Id": "*int",
