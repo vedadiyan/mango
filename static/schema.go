@@ -60,6 +60,7 @@ type (
 	}
 
 	Array[T Composite | Scalar] struct {
+		Required        bool
 		Items           T
 		MinItems        int
 		MaxItems        int

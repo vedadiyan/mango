@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/iancoleman/strcase"
 	"github.com/vedadiyan/mango/internal/codegen"
+	"github.com/vedadiyan/mango/static"
 )
 
 type (
@@ -26,6 +27,7 @@ type (
 	}
 
 	GoTypeOption func(*GoTypeOptions)
+	GoTagOption  func(*[]string)
 )
 
 const (
@@ -37,6 +39,10 @@ const (
 	CombinatorTypeAnyOf   CombinatorType = "AnyOf"
 	CombinatorTypeAllOf   CombinatorType = "AllOf"
 	CombinatorTypeNot     CombinatorType = "Not"
+)
+
+var (
+	opaqueTypes = []string{"time.Time", "bson.ObjectID"}
 )
 
 func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) (Types, error) {
@@ -69,11 +75,9 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 	out[parentIdentKey] = make(map[string]string)
 
 	for explicitKey, value := range properties {
-		identKey := MakePascalCase(explicitKey)
-		currentIdentSlice := append(parents, identKey)
-		typeName := identKey
+
 		if value.IsArray() {
-			res, err := ToGoArrayType(1, identKey, value, parents)
+			res, err := ToGoArrayType(1, explicitKey, value, parents)
 			if err != nil {
 				return nil, err
 			}
@@ -81,13 +85,18 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 			continue
 		}
 		if value.IsCombinator() {
-			res, err := ToGoCombinatorType(identKey, value, parents)
+			res, err := ToGoCombinatorType(explicitKey, value, parents)
 			if err != nil {
 				return nil, err
 			}
 			deepCopy(out, res)
 			continue
 		}
+
+		identKey := MakePascalCase(explicitKey)
+		currentIdentSlice := append(parents, identKey)
+		typeName := identKey
+
 		if value.IsObject() {
 			res, err := ToGoTypeModel(value, currentIdentSlice, forceOptional)
 			if err != nil {
@@ -132,7 +141,10 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 		if err != nil {
 			return nil, err
 		}
-		out[parentIdentKey][identKey] = goType
+
+		goTags := GetTags(explicitKey, WithOmitEmpty(!explicitRequired || forceOptional), WithOpaque(goType))
+
+		out[parentIdentKey][identKey] = fmt.Sprintf("%s %s", goType, goTags)
 	}
 
 	for _, rootCombinator := range rootCombinators {
@@ -146,8 +158,8 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 	return out, nil
 }
 
-func ToGoArrayType(dim int, key string, value codegen.TypedParam, parents []string) (Types, error) {
-	if strings.TrimSpace(key) == EmptyString {
+func ToGoArrayType(dim int, explicitKey string, value codegen.TypedParam, parents []string) (Types, error) {
+	if strings.TrimSpace(explicitKey) == EmptyString {
 		return nil, fmt.Errorf("array definition requires a key")
 	}
 
@@ -169,7 +181,12 @@ func ToGoArrayType(dim int, key string, value codegen.TypedParam, parents []stri
 		return nil, fmt.Errorf("expected at least one type but found zero")
 	}
 
-	identKey := key
+	explicitRequired, err := value.GetRequiredOrFalse()
+	if err != nil {
+		return nil, err
+	}
+
+	identKey := MakePascalCase(explicitKey)
 	parentIdentKey := flaten(parents)
 	currentIdentSlice := append(parents, identKey)
 
@@ -208,11 +225,14 @@ func ToGoArrayType(dim int, key string, value codegen.TypedParam, parents []stri
 	if err != nil {
 		return nil, err
 	}
-	out[parentIdentKey][identKey] = fmt.Sprintf("%s%s", strings.Repeat("[]", dim), goType)
+
+	goTags := GetTags(explicitKey, WithOmitEmpty(!explicitRequired))
+
+	out[parentIdentKey][identKey] = fmt.Sprintf("%s%s %s", strings.Repeat("[]", dim), goType, goTags)
 	return out, nil
 }
 
-func ToGoCombinatorType(key string, value codegen.TypedParam, parents []string) (Types, error) {
+func ToGoCombinatorType(explicitKey string, value codegen.TypedParam, parents []string) (Types, error) {
 	schema, err := value.GetSchema()
 	if err != nil {
 		return nil, err
@@ -227,9 +247,9 @@ func ToGoCombinatorType(key string, value codegen.TypedParam, parents []string) 
 		return nil, err
 	}
 
-	identKey := key
+	identKey := MakePascalCase(explicitKey)
 	isDynamicIdent := false
-	if strings.TrimSpace(key) == EmptyString {
+	if strings.TrimSpace(identKey) == EmptyString {
 		identKey = uuid.NewString()
 		isDynamicIdent = true
 	}
@@ -304,11 +324,15 @@ func ToGoCombinatorType(key string, value codegen.TypedParam, parents []string) 
 		if err != nil {
 			return nil, err
 		}
-		out[currentIdentKey][innerIdentKey] = goType
+
+		goTags := GetTags(*explicitObjectName, WithOmitEmpty(!explicitRequired), WithOpaque(goType))
+
+		out[currentIdentKey][innerIdentKey] = fmt.Sprintf("%s %s", goType, goTags)
 	}
 
 	if !isDynamicIdent {
-		out[parentIdentKey][key] = currentIdentKey
+		goTags := GetTags(explicitKey)
+		out[parentIdentKey][identKey] = fmt.Sprintf("%s %s", currentIdentKey, goTags)
 		return out, nil
 	}
 
@@ -338,8 +362,8 @@ func GetGoType(in []string, name string, opts ...GoTypeOption) (string, error) {
 
 	typ := EmptyString
 	for _, i := range in {
-		switch i {
-		case "null":
+		switch static.BasicType(i) {
+		case static.TypeNil:
 			{
 				options.optional = "*"
 			}
@@ -347,9 +371,37 @@ func GetGoType(in []string, name string, opts ...GoTypeOption) (string, error) {
 			{
 				typ = name
 			}
-		case "binData":
+		case static.TypeBinary:
 			{
 				typ = "[]byte"
+			}
+		case static.TypeBool:
+			{
+				typ = "bool"
+			}
+		case static.TypeDecimal, static.TypeDouble:
+			{
+				typ = "float64"
+			}
+		case static.TypeInt:
+			{
+				typ = "int32"
+			}
+		case static.TypeLong:
+			{
+				typ = "int64"
+			}
+		case static.TypeString, static.TypeJavaScript, static.TypeRegex:
+			{
+				typ = "string"
+			}
+		case static.TypeTimeStamp:
+			{
+				typ = "time.Time"
+			}
+		case static.TypeObjectId:
+			{
+				typ = "bson.ObjectID"
 			}
 		default:
 			{
@@ -363,6 +415,33 @@ func GetGoType(in []string, name string, opts ...GoTypeOption) (string, error) {
 	}
 
 	return fmt.Sprintf("%s%s", options.optional, typ), nil
+}
+
+func WithOmitEmpty(val bool) GoTagOption {
+	return func(s *[]string) {
+		if val {
+			*s = append(*s, "omitempty")
+		}
+	}
+}
+
+func WithOpaque(goTypeName string) GoTagOption {
+	return func(s *[]string) {
+		if slices.Contains(opaqueTypes, strings.TrimLeft(goTypeName, "*")) {
+			*s = append(*s, "opaque")
+		}
+	}
+}
+
+func GetTags(explicitName string, opts ...GoTagOption) string {
+	tags := make([]string, 0)
+	tags = append(tags, explicitName)
+
+	for _, opt := range opts {
+		opt(&tags)
+	}
+
+	return fmt.Sprintf("`bson:\"%s\"`", strings.Join(tags, ","))
 }
 
 func deepCopy(dest Types, src Types) {

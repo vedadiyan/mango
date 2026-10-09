@@ -19,7 +19,8 @@ func DefineExport() static.Schema {
 				Items: static.Composite{
 					Properties: static.Properties{
 						"id": static.Scalar{
-							Type: static.BasicTypes{static.TypeInt},
+							Type:     static.BasicTypes{static.TypeInt},
+							Required: true,
 						},
 						"name": static.Scalar{
 							Type: static.BasicTypes{static.TypeString},
@@ -110,7 +111,7 @@ func DefineExport() static.Schema {
 							static.Composite{
 								Properties: static.Properties{
 									"responsibility": static.Scalar{
-										Type:     static.BasicTypes{static.TypeString},
+										Type:     static.BasicTypes{static.TypeTimeStamp},
 										Required: true,
 									},
 								},
