@@ -14,20 +14,25 @@ import (
 	// | Begin Type Definition For: {{ $type }}
 	// +--------------------------------------------------+
 
-	type {{ $type }} bson.E
+	type {{ $type }} bson.D
 
 	{{- range $fieldName, $specs := $fields }}
 
 		// +--------------------------------------------------+
-		// |    Begin Field Definition For: {{ $type }}
-		// |    Field Name: {{ $fieldName }}
+		// |    Begin Field Definition For: {{ $fieldName }}
 		// +--------------------------------------------------+
+
+		var _{{ $type }}{{ $fieldName }}Name = db.FieldName[{{ $type }}{{ $fieldName }}Specs]()
+
+		func {{ $type }}{{ $fieldName }}Name() string { 
+		return _{{ $type }}{{ $fieldName }}Name
+		}
 
 		{{- if hasPrefix (index $specs 0) "$" }} 
 			type {{ $type }}{{ $fieldName }}Specs struct {
 			{{ $fieldName }}  {{ trimPrefix (index $specs 0) "$" }}  {{ index $specs 1 }}
 			}
-            {{ continue }}
+			{{ continue }}
 		{{- end }}
 
 		{{ $preferredType := (whichType (index $specs 0)) }}
@@ -35,19 +40,31 @@ import (
 			type {{ $type }}{{ $fieldName }}Specs[T any] struct {
 			{{ $fieldName }} {{ $preferredType }} {{ index $specs 1 }}
 			}
+
+			func (x {{ $type }}) {{ $type }}{{ $fieldName }}(v  {{ $type }}{{ $fieldName }}) {{ $type }} {
+			return append(x, bson.E{Key: {{ $type }}{{ $fieldName }}Name(), Value: v})
+			}
+
+			func {{ $type }}{{ $fieldName }}BsonE(v  {{ $type }}{{ $fieldName }}) bson.E {
+			return bson.E{Key: {{ $type }}{{ $fieldName }}Name(), Value: v}
+			}
+
 		{{- else }}
 			type {{ $type }}{{ $fieldName }}Specs struct {
 			{{ $fieldName }}  {{ index $specs 0 }}  {{ index $specs 1 }}
 			}
+
+			func (x {{ $type }}) {{ $type }}{{ $fieldName }}(v  {{ index $specs 0 }}) {{ $type }} {
+			return append(x, bson.E{Key: {{ $type }}{{ $fieldName }}Name(), Value: v})
+			}
+
+			func {{ $type }}{{ $fieldName }}BsonE(v  {{ index $specs 0 }}) bson.E {
+			return bson.E{Key: {{ $type }}{{ $fieldName }}Name(), Value: v}
+			}
 		{{- end }}
 
 
-		{{/* 
-        var _{{ $fieldName }}Name = db.FieldName[{{ $fieldName }}Specs]()
 
-        func {{ $fieldName }}Name() string { 
-            return _{{ $fieldName }}Name
-        } */}}
 		{{/* 
         func {{ $fieldName }}(v {{ index $specs 0 }}) {{ $type }} {
             return {{ $type }}(bson.E{Key: {{ $fieldName }}Name(), Value: v})
