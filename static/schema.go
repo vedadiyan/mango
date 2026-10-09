@@ -22,13 +22,19 @@ type (
 		ExclusiveMin bool
 		ExclusiveMax bool
 		MultipleOf   float64
-		MinLen       int
+		MinLen       uint
 		MaxLen       int
 		Pattern      string
-		Enum         []any
 		Index        Index
 
 		ObjectName string
+	}
+
+	Enum[T Int | Float | String] struct {
+		Title       string
+		Description string
+		Required    bool
+		Enum        []T
 	}
 
 	Composite struct {
@@ -101,6 +107,10 @@ type (
 
 	Condition  map[string]any
 	Conditions []Condition
+
+	Int    int64
+	Float  float64
+	String string
 )
 
 const (
@@ -123,6 +133,10 @@ func justPanic() {
 }
 
 func (Scalar) typ() {
+	justPanic()
+}
+
+func (Enum[T]) typ() {
 	justPanic()
 }
 

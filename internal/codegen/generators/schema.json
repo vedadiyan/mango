@@ -1,11 +1,15 @@
 {
 	"$ExportSubscription": {
-		"ExportSubscriptionAdvanced": [
-			"Advanced",
+		"$type": [
+			"int64",
 			""
 		],
-		"ExportSubscriptionNormal": [
-			"Normal",
+		"ExportSubscription1": [
+			"1",
+			""
+		],
+		"ExportSubscription2": [
+			"2",
 			""
 		]
 	},

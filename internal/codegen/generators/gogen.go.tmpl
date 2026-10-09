@@ -8,7 +8,21 @@ import (
 )
 
 {{- range $type, $fields := .Fields }}
-	{{- if hasPrefix $type "$" }} {{ continue }} {{- end }}
+	{{- if hasPrefix $type "$" }} 
+		// +--------------------------------------------------+
+		// | Begin Enum Definition For: {{ $type }}
+		// +--------------------------------------------------+
+		{{ $typeName := trimPrefix $type "$" }}
+		type {{ $typeName }} {{ index (index $fields "$type") 0}}
+		{{- range $enumKey, $enumValue := $fields }}
+			{{- if eq $enumKey "$type"}} {{ continue }} {{- end }}
+			const {{ $enumKey }}  {{ $typeName }} = {{ index $enumValue 0 }} 
+		{{- end }}
+		// +--------------------------------------------------+
+		// | End Enum Definition For: {{ $type }}
+		// +--------------------------------------------------+
+		{{ continue }} 
+	{{- end }}
 
 	// +--------------------------------------------------+
 	// | Begin Type Definition For: {{ $type }}

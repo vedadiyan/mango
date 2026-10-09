@@ -10,7 +10,8 @@ func DefineExport() static.Schema {
 		Description: "Test Description",
 		Properties: static.Properties{
 			"first_name": static.Scalar{
-				Type: static.BasicTypes{static.TypeString},
+				Type:   static.BasicTypes{static.TypeString},
+				MinLen: 10,
 			},
 			"last_name": static.Scalar{
 				Type: static.BasicTypes{static.TypeString},
@@ -28,8 +29,8 @@ func DefineExport() static.Schema {
 					},
 				},
 			},
-			"subscription": static.Scalar{
-				Enum: []any{"Normal", "Advanced"},
+			"subscription": static.Enum[static.Int]{
+				Enum: []static.Int{1, 2},
 			},
 			"address": static.Composite{
 				Properties: static.Properties{

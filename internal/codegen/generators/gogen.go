@@ -198,10 +198,25 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 			enumType := flaten([]string{"$", constructedTypeName})
 			out[enumType] = make(map[string][2]string)
 
+			typ := EmptyString
 			for _, value := range explicitEnum {
-				enumValue := fmt.Sprintf("%v", value)
-				out[enumType][flaten(append(currentIdentSlice, enumValue))] = [2]string{enumValue}
+				if typ == EmptyString {
+					typ = fmt.Sprintf("%T", value)
+				}
+				switch t := value.(type) {
+				case string:
+					{
+						enumValue := fmt.Sprintf("\"%s\"", t)
+						out[enumType][flaten(append(currentIdentSlice, t))] = [2]string{enumValue}
+					}
+				default:
+					{
+						enumValue := fmt.Sprintf("%v", t)
+						out[enumType][flaten(append(currentIdentSlice, enumValue))] = [2]string{enumValue}
+					}
+				}
 			}
+			out[enumType]["$type"] = [2]string{typ}
 		}
 
 		explicitRequired, err := value.GetRequiredOrFalse()
