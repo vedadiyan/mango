@@ -36,16 +36,18 @@ import (
 		// |    Begin Field Definition For: {{ $fieldName }}
 		// +--------------------------------------------------+
 
-		var _{{ $type }}{{ $fieldName }}Name = db.FieldName[{{ $type }}{{ $fieldName }}Specs]()
-
-		func {{ $type }}{{ $fieldName }}Name() string { 
-		return _{{ $type }}{{ $fieldName }}Name
-		}
 
 		{{- if hasPrefix (index $specs 0) "$" }} 
 			type {{ $type }}{{ $fieldName }}Specs struct {
 			{{ $fieldName }}  {{ trimPrefix (index $specs 0) "$" }}  {{ index $specs 1 }}
 			}
+
+			var _{{ $type }}{{ $fieldName }}Name = tools.FieldName[{{ $type }}{{ $fieldName }}Specs]()
+
+			func {{ $type }}{{ $fieldName }}Name() string { 
+			return _{{ $type }}{{ $fieldName }}Name
+			}
+			
 			{{ continue }}
 		{{- end }}
 
@@ -53,6 +55,12 @@ import (
 		{{- if ne $preferredType (index $specs 0) }} 
 			type {{ $type }}{{ $fieldName }}Specs[T any] struct {
 			{{ $fieldName }} {{ $preferredType }} {{ index $specs 1 }}
+			}
+
+			var _{{ $type }}{{ $fieldName }}Name = tools.FieldName[{{ $type }}{{ $fieldName }}Specs[any]]()
+
+			func {{ $type }}{{ $fieldName }}Name() string { 
+			return _{{ $type }}{{ $fieldName }}Name
 			}
 
 			func (x {{ $type }}) {{ $type }}{{ $fieldName }}(v  {{ $type }}{{ $fieldName }}) {{ $type }} {
@@ -66,6 +74,12 @@ import (
 		{{- else }}
 			type {{ $type }}{{ $fieldName }}Specs struct {
 			{{ $fieldName }}  {{ index $specs 0 }}  {{ index $specs 1 }}
+			}
+
+			var _{{ $type }}{{ $fieldName }}Name = tools.FieldName[{{ $type }}{{ $fieldName }}Specs]()
+
+			func {{ $type }}{{ $fieldName }}Name() string { 
+			return _{{ $type }}{{ $fieldName }}Name
 			}
 
 			func (x {{ $type }}) {{ $type }}{{ $fieldName }}(v  {{ index $specs 0 }}) {{ $type }} {

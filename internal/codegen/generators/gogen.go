@@ -108,7 +108,7 @@ func GoGenRender(types Types) {
 		panic(err)
 	}
 	var buffer bytes.Buffer
-	if err := tmpl.Execute(&buffer, &GoGenModel{"test", nil, types}); err != nil {
+	if err := tmpl.Execute(&buffer, &GoGenModel{"test", []string{"github.com/vedadiyan/mango/tools", "go.mongodb.org/mongo-driver/v2/bson"}, types}); err != nil {
 		panic(err)
 	}
 	os.WriteFile("test.go", buffer.Bytes(), os.ModePerm)
