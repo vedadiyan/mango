@@ -26,6 +26,7 @@ func TestRead(t *testing.T) {
 		if err != nil {
 			t.FailNow()
 		}
+		GoGenRender(value)
 		json, err := json.MarshalIndent(value, "", "\t")
 		if err != nil {
 			t.FailNow()

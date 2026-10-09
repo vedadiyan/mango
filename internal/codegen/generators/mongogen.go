@@ -14,15 +14,15 @@ type (
 		Sparse     *bool
 		Background *bool
 	}
-	BsonSchema struct {
-		Title        *string                `json:"title,omitempty"`
-		Description  *string                `json:"description,omitempty"`
-		Type         []string               `json:"bsonType,omitempty"`
-		Properties   map[string]*BsonSchema `json:"properties,omitempty"`
-		Items        any                    `json:"items,omitempty"`
-		Required     []string               `json:"required,omitempty"`
-		Dependencies map[string][]string    `json:"dependencies,omitempty"`
-		Enum         []any                  `json:"enum,omitempty"`
+	BsonSchemaModel struct {
+		Title        *string                     `json:"title,omitempty"`
+		Description  *string                     `json:"description,omitempty"`
+		Type         []string                    `json:"bsonType,omitempty"`
+		Properties   map[string]*BsonSchemaModel `json:"properties,omitempty"`
+		Items        any                         `json:"items,omitempty"`
+		Required     []string                    `json:"required,omitempty"`
+		Dependencies map[string][]string         `json:"dependencies,omitempty"`
+		Enum         []any                       `json:"enum,omitempty"`
 
 		MinLen  *int64  `json:"minLength,omitempty"`
 		MaxLen  *int64  `json:"maxLength,omitempty"`
@@ -44,10 +44,10 @@ type (
 		AdditionalItems      *bool `json:"additionalItems,omitempty"`
 		AdditionalProperties *bool `json:"additionalProperties,omitempty"`
 
-		AnyOf []*BsonSchema `json:"anyOf,omitempty"`
-		OneOf []*BsonSchema `json:"oneOf,omitempty"`
-		AllOf []*BsonSchema `json:"allOf,omitempty"`
-		Not   *BsonSchema   `json:"not,omitempty"`
+		AnyOf []*BsonSchemaModel `json:"anyOf,omitempty"`
+		OneOf []*BsonSchemaModel `json:"oneOf,omitempty"`
+		AllOf []*BsonSchemaModel `json:"allOf,omitempty"`
+		Not   *BsonSchemaModel   `json:"not,omitempty"`
 
 		index Index
 
@@ -55,7 +55,7 @@ type (
 	}
 )
 
-func ToMongoValidationSchema(in *BsonSchema) (string, error) {
+func ToMongoValidationSchema(in *BsonSchemaModel) (string, error) {
 	val := any(in)
 
 	if in.Conditions != nil {
@@ -70,8 +70,8 @@ func ToMongoValidationSchema(in *BsonSchema) (string, error) {
 	return string(out), nil
 }
 
-func ToBsonSchema(in codegen.TypedParam) (*BsonSchema, error) {
-	out := &BsonSchema{}
+func ToBsonSchema(in codegen.TypedParam) (*BsonSchemaModel, error) {
+	out := &BsonSchemaModel{}
 	typeSchema, err := in.GetSchema()
 	if err != nil {
 		return nil, err
@@ -194,7 +194,7 @@ func ToBsonSchema(in codegen.TypedParam) (*BsonSchema, error) {
 	out.Dependencies = dependencies
 	out.Conditions = conditions
 
-	out.Properties = make(map[string]*BsonSchema)
+	out.Properties = make(map[string]*BsonSchemaModel)
 
 	required, err := typeSchema.GetRequiredStringArray()
 	if err != nil {
@@ -216,7 +216,7 @@ func ToBsonSchema(in codegen.TypedParam) (*BsonSchema, error) {
 	switch firstOrDefault(typ) {
 	case "oneof":
 		{
-			items := make([]*BsonSchema, 0)
+			items := make([]*BsonSchemaModel, 0)
 			for _, item := range specs {
 				bsonSchema, err := ToBsonSchema(item)
 				if err != nil {
@@ -228,7 +228,7 @@ func ToBsonSchema(in codegen.TypedParam) (*BsonSchema, error) {
 		}
 	case "anyof":
 		{
-			items := make([]*BsonSchema, 0)
+			items := make([]*BsonSchemaModel, 0)
 			for _, item := range specs {
 				bsonSchema, err := ToBsonSchema(item)
 				if err != nil {
@@ -241,7 +241,7 @@ func ToBsonSchema(in codegen.TypedParam) (*BsonSchema, error) {
 	case "allof":
 		{
 
-			items := make([]*BsonSchema, 0)
+			items := make([]*BsonSchemaModel, 0)
 			for _, item := range specs {
 				bsonSchema, err := ToBsonSchema(item)
 				if err != nil {
@@ -285,7 +285,7 @@ func ToBsonSchema(in codegen.TypedParam) (*BsonSchema, error) {
 				case codegen.Items:
 					{
 						out.Type = []string{"array"}
-						items := make([]*BsonSchema, 0)
+						items := make([]*BsonSchemaModel, 0)
 						for _, item := range t {
 							bsonSchema, err := ToBsonSchema(item)
 							if err != nil {

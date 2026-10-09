@@ -2,10 +2,14 @@ package generators
 
 import (
 	"bytes"
+	_ "embed"
 	"fmt"
 	"maps"
+	"os"
+	"regexp"
 	"slices"
 	"strings"
+	"text/template"
 
 	"github.com/google/uuid"
 	"github.com/iancoleman/strcase"
@@ -18,7 +22,7 @@ type (
 	GoStructType string
 	GoArrayType  string
 
-	Types map[string]map[string]string
+	Types map[string]map[string][2]string
 
 	CombinatorType string
 
@@ -28,6 +32,18 @@ type (
 
 	GoTypeOption func(*GoTypeOptions)
 	GoTagOption  func(*[]string)
+
+	Field struct {
+		Name string
+		Type string
+		Tags string
+	}
+
+	GoGenModel struct {
+		PackageName string
+		ImportList  []string
+		Fields      Types
+	}
 )
 
 const (
@@ -42,8 +58,61 @@ const (
 )
 
 var (
-	opaqueTypes = []string{"time.Time", "bson.ObjectID"}
+	//go:embed gogen.go.tmpl
+	goGenTemplate string
+	opaqueTypes   = []string{"time.Time", "bson.ObjectID"}
+	systemTypes   = []string{
+		"bool",
+		"int",
+		"int8",
+		"int16",
+		"int32",
+		"int64",
+		"uint",
+		"uint8",
+		"uint16",
+		"uint32",
+		"uint64",
+		"float32",
+		"float64",
+		"complex64",
+		"complex128",
+		"string",
+		"byte",
+		"rune",
+		"time.Time",
+		"bson.ObjectID",
+	}
 )
+
+func GoGenRender(types Types) {
+	tmpl := template.New("test")
+	pattern := regexp.MustCompile(`([\*\[\]]*)`)
+	tmpl.Funcs(template.FuncMap{
+		"hasPrefix": func(a, b string) bool {
+			return strings.HasPrefix(a, b)
+		},
+		"whichType": func(in string) string {
+			values := SplitInTwo(pattern, in)
+			if !slices.Contains(systemTypes, values[1]) {
+				return fmt.Sprintf("%sT", values[0])
+			}
+			return in
+		},
+		"trimPrefix": func(in string, prefix string) string {
+			return strings.TrimPrefix(in, prefix)
+		},
+	})
+	tmpl, err := tmpl.Parse(goGenTemplate)
+	if err != nil {
+		panic(err)
+	}
+	var buffer bytes.Buffer
+	if err := tmpl.Execute(&buffer, &GoGenModel{"test", nil, types}); err != nil {
+		panic(err)
+	}
+	os.WriteFile("test.go", buffer.Bytes(), os.ModePerm)
+}
 
 func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) (Types, error) {
 	schema, err := in.GetSchema()
@@ -72,7 +141,7 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 
 	out := make(Types)
 	parentIdentKey := flaten(parents)
-	out[parentIdentKey] = make(map[string]string)
+	out[parentIdentKey] = make(map[string][2]string)
 
 	for explicitKey, value := range properties {
 
@@ -112,6 +181,7 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 		}
 
 		constructedType := explicitType
+		isEnum := false
 
 		if explicitType == nil {
 			explicitEnum, err := value.GetEnum()
@@ -119,14 +189,18 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 				return nil, err
 			}
 
+			if explicitEnum == nil {
+				return nil, fmt.Errorf("unspecified type")
+			}
+			isEnum = true
 			constructedTypeName := flaten(currentIdentSlice)
 			constructedType = []string{constructedTypeName}
 			enumType := flaten([]string{"$", constructedTypeName})
-			out[enumType] = make(map[string]string)
+			out[enumType] = make(map[string][2]string)
 
 			for _, value := range explicitEnum {
 				enumValue := fmt.Sprintf("%v", value)
-				out[enumType][flaten(append(currentIdentSlice, enumValue))] = enumValue
+				out[enumType][flaten(append(currentIdentSlice, enumValue))] = [2]string{enumValue}
 			}
 		}
 
@@ -144,7 +218,11 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 
 		goTags := GetTags(explicitKey, WithOmitEmpty(!explicitRequired || forceOptional), WithOpaque(goType))
 
-		out[parentIdentKey][identKey] = fmt.Sprintf("%s %s", goType, goTags)
+		if isEnum {
+			goType = fmt.Sprintf("$%s", goType)
+		}
+
+		out[parentIdentKey][identKey] = [2]string{goType, goTags}
 	}
 
 	for _, rootCombinator := range rootCombinators {
@@ -191,10 +269,10 @@ func ToGoArrayType(dim int, explicitKey string, value codegen.TypedParam, parent
 	currentIdentSlice := append(parents, identKey)
 
 	out := make(Types)
-	out[parentIdentKey] = make(map[string]string)
+	out[parentIdentKey] = make(map[string][2]string)
 
 	if len(items) > 1 {
-		out[parentIdentKey][identKey] = "[]any"
+		out[parentIdentKey][identKey] = [2]string{"[]any"}
 		return out, nil
 	}
 
@@ -228,7 +306,7 @@ func ToGoArrayType(dim int, explicitKey string, value codegen.TypedParam, parent
 
 	goTags := GetTags(explicitKey, WithOmitEmpty(!explicitRequired))
 
-	out[parentIdentKey][identKey] = fmt.Sprintf("%s%s %s", strings.Repeat("[]", dim), goType, goTags)
+	out[parentIdentKey][identKey] = [2]string{fmt.Sprintf("%s%s", strings.Repeat("[]", dim), goType), goTags}
 	return out, nil
 }
 
@@ -263,8 +341,8 @@ func ToGoCombinatorType(explicitKey string, value codegen.TypedParam, parents []
 	currentIdentKey := flaten(append(parents, identKey))
 
 	out := make(Types)
-	out[parentIdentKey] = make(map[string]string)
-	out[currentIdentKey] = make(map[string]string)
+	out[parentIdentKey] = make(map[string][2]string)
+	out[currentIdentKey] = make(map[string][2]string)
 
 	for _, spec := range specs {
 		innerSchema, err := spec.GetSchema()
@@ -327,12 +405,12 @@ func ToGoCombinatorType(explicitKey string, value codegen.TypedParam, parents []
 
 		goTags := GetTags(*explicitObjectName, WithOmitEmpty(!explicitRequired), WithOpaque(goType))
 
-		out[currentIdentKey][innerIdentKey] = fmt.Sprintf("%s %s", goType, goTags)
+		out[currentIdentKey][innerIdentKey] = [2]string{goType, goTags}
 	}
 
 	if !isDynamicIdent {
 		goTags := GetTags(explicitKey)
-		out[parentIdentKey][identKey] = fmt.Sprintf("%s %s", currentIdentKey, goTags)
+		out[parentIdentKey][identKey] = [2]string{currentIdentKey, goTags}
 		return out, nil
 	}
 
@@ -481,4 +559,29 @@ func GetCombinatorType(in string) (CombinatorType, bool) {
 			return CombinatorType(""), false
 		}
 	}
+}
+
+func SplitInTwo(re *regexp.Regexp, s string) []string {
+	n := 2
+
+	if len(s) == 0 {
+		return []string{""}
+	}
+
+	matches := re.FindAllStringIndex(s, n)
+	strings := make([]string, 0, len(matches))
+
+	for i := range len(matches) - 1 {
+		match := matches[i]
+		if n > 0 && len(strings) >= n-1 {
+			break
+		}
+
+		strings = append(strings, s[match[0]:match[1]])
+	}
+
+	finalMatch := matches[len(matches)-1]
+	strings = append(strings, s[finalMatch[0]-1:])
+
+	return strings
 }

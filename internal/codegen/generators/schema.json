@@ -1,40 +1,112 @@
 {
 	"$ExportSubscription": {
-		"ExportSubscriptionAdvanced": "Advanced",
-		"ExportSubscriptionNormal": "Normal"
+		"ExportSubscriptionAdvanced": [
+			"Advanced",
+			""
+		],
+		"ExportSubscriptionNormal": [
+			"Normal",
+			""
+		]
 	},
 	"Export": {
-		"Address": "*ExportAddress `bson:\"address,omitempty\"`",
-		"Details": "ExportDetails `bson:\"details\"`",
-		"FirstName": "*string `bson:\"first_name,omitempty\"`",
-		"Hobbie": "*string `bson:\"hobbie,omitempty\"`",
-		"Hobbie2": "*string `bson:\"hobbie2,omitempty\"`",
-		"LastName": "*string `bson:\"last_name,omitempty\"`",
-		"Products": "[]ExportProducts `bson:\"products,omitempty\"`",
-		"Responsibility": "*time.Time `bson:\"responsibility,omitempty,opaque\"`",
-		"Role": "*string `bson:\"role,omitempty\"`",
-		"Skills": "*string `bson:\"skills,omitempty\"`",
-		"Subscription": "*ExportSubscription `bson:\"subscription,omitempty\"`"
+		"Address": [
+			"*ExportAddress",
+			"`bson:\"address,omitempty\"`"
+		],
+		"Details": [
+			"ExportDetails",
+			"`bson:\"details\"`"
+		],
+		"FirstName": [
+			"*string",
+			"`bson:\"first_name,omitempty\"`"
+		],
+		"Hobbie": [
+			"*string",
+			"`bson:\"hobbie,omitempty\"`"
+		],
+		"Hobbie2": [
+			"*string",
+			"`bson:\"hobbie2,omitempty\"`"
+		],
+		"LastName": [
+			"*string",
+			"`bson:\"last_name,omitempty\"`"
+		],
+		"Products": [
+			"[]ExportProducts",
+			"`bson:\"products\"`"
+		],
+		"Responsibility": [
+			"*time.Time",
+			"`bson:\"responsibility,omitempty,opaque\"`"
+		],
+		"Role": [
+			"*string",
+			"`bson:\"role,omitempty\"`"
+		],
+		"Skills": [
+			"*string",
+			"`bson:\"skills,omitempty\"`"
+		],
+		"Subscription": [
+			"$*ExportSubscription",
+			"`bson:\"subscription,omitempty\"`"
+		]
 	},
 	"ExportAddress": {
-		"PostalCode": "*string `bson:\"postal_code,omitempty\"`",
-		"Street": "*string `bson:\"street,omitempty\"`"
+		"PostalCode": [
+			"*string",
+			"`bson:\"postal_code,omitempty\"`"
+		],
+		"Street": [
+			"*string",
+			"`bson:\"street,omitempty\"`"
+		]
 	},
 	"ExportDetails": {
-		"CustomerName": "*string `bson:\"customer_name,omitempty\"`",
-		"Email": "*string `bson:\"email,omitempty\"`",
-		"Legal": "*ExportDetailsLegal `bson:\"legal,omitempty\"`"
+		"CustomerName": [
+			"*string",
+			"`bson:\"customer_name,omitempty\"`"
+		],
+		"Email": [
+			"*string",
+			"`bson:\"email,omitempty\"`"
+		],
+		"Legal": [
+			"*ExportDetailsLegal",
+			"`bson:\"legal,omitempty\"`"
+		]
 	},
 	"ExportDetailsLegal": {
-		"CompanyName": "string `bson:\"company_name\"`",
-		"InnerField": "*ExportDetailsLegalInnerField `bson:\"inner_field,omitempty\"`",
-		"TaxId": "string `bson:\"tax_id\"`"
+		"CompanyName": [
+			"string",
+			"`bson:\"company_name\"`"
+		],
+		"InnerField": [
+			"*ExportDetailsLegalInnerField",
+			"`bson:\"inner_field,omitempty\"`"
+		],
+		"TaxId": [
+			"string",
+			"`bson:\"tax_id\"`"
+		]
 	},
 	"ExportDetailsLegalInnerField": {
-		"Id": "*int32 `bson:\"id,omitempty\"`"
+		"Id": [
+			"*int32",
+			"`bson:\"id,omitempty\"`"
+		]
 	},
 	"ExportProducts": {
-		"Id": "int32 `bson:\"id\"`",
-		"Name": "*string `bson:\"name,omitempty\"`"
+		"Id": [
+			"*int32",
+			"`bson:\"id,omitempty\"`"
+		],
+		"Name": [
+			"*string",
+			"`bson:\"name,omitempty\"`"
+		]
 	}
 }

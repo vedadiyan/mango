@@ -1,0 +1,73 @@
+package {{ .PackageName }}
+
+import (
+{{- range $import := .ImportList }}
+	"{{ $import }}"
+{{- end }}
+
+)
+
+{{- range $type, $fields := .Fields }}
+	{{- if hasPrefix $type "$" }} {{ continue }} {{- end }}
+
+	// +--------------------------------------------------+
+	// | Begin Type Definition For: {{ $type }}
+	// +--------------------------------------------------+
+
+	type {{ $type }} bson.E
+
+	{{- range $fieldName, $specs := $fields }}
+
+		// +--------------------------------------------------+
+		// |    Begin Field Definition For: {{ $type }}
+		// |    Field Name: {{ $fieldName }}
+		// +--------------------------------------------------+
+
+		{{- if hasPrefix (index $specs 0) "$" }} 
+			type {{ $type }}{{ $fieldName }}Specs struct {
+			{{ $fieldName }}  {{ trimPrefix (index $specs 0) "$" }}  {{ index $specs 1 }}
+			}
+            {{ continue }}
+		{{- end }}
+
+		{{ $preferredType := (whichType (index $specs 0)) }}
+		{{- if ne $preferredType (index $specs 0) }} 
+			type {{ $type }}{{ $fieldName }}Specs[T any] struct {
+			{{ $fieldName }} {{ $preferredType }} {{ index $specs 1 }}
+			}
+		{{- else }}
+			type {{ $type }}{{ $fieldName }}Specs struct {
+			{{ $fieldName }}  {{ index $specs 0 }}  {{ index $specs 1 }}
+			}
+		{{- end }}
+
+
+		{{/* 
+        var _{{ $fieldName }}Name = db.FieldName[{{ $fieldName }}Specs]()
+
+        func {{ $fieldName }}Name() string { 
+            return _{{ $fieldName }}Name
+        } */}}
+		{{/* 
+        func {{ $fieldName }}(v {{ index $specs 0 }}) {{ $type }} {
+            return {{ $type }}(bson.E{Key: {{ $fieldName }}Name(), Value: v})
+        }
+        
+        func {{ $fieldName }}IfPresent(v {{- if not (hasPrefix (index $specs 0) "*") }} *{{- end}} {{- index $specs 0 }}) {{ $type }} {
+            if v == nil {
+                return {{ $type }}(bson.E{})
+            }
+            return {{ $type }}(bson.E{Key: {{ $fieldName }}Name(), Value: v})
+        } */}}
+
+		// +--------------------------------------------------+
+		// |    End Field Definition For: {{ $fieldName }}
+		// +--------------------------------------------------+
+
+	{{- end }}
+
+	// +--------------------------------------------------+
+	// | End Type Definition For: {{ $type }}
+	// +--------------------------------------------------+
+
+{{- end }}

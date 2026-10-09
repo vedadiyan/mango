@@ -16,11 +16,11 @@ func DefineExport() static.Schema {
 				Type: static.BasicTypes{static.TypeString},
 			},
 			"products": static.Array[static.Composite]{
+				Required: true,
 				Items: static.Composite{
 					Properties: static.Properties{
 						"id": static.Scalar{
-							Type:     static.BasicTypes{static.TypeInt},
-							Required: true,
+							Type: static.BasicTypes{static.TypeInt},
 						},
 						"name": static.Scalar{
 							Type: static.BasicTypes{static.TypeString},
