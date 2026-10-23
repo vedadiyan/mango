@@ -64,6 +64,12 @@ import (
 			}
 
 			func (x {{ $type }}) Set{{ $type }}{{ $fieldName }}(v  {{ $type }}{{ $fieldName }}) {{ $type }} {
+			for i := range x {
+				if x[i].Key == {{ $type }}{{ $fieldName }}Name() {
+					x[i].Value = v
+					return x
+				}
+			}
 			return append(x, bson.E{Key: {{ $type }}{{ $fieldName }}Name(), Value: v})
 			}
 
@@ -120,6 +126,12 @@ import (
 			}
 
 			func (x {{ $type }}) Set{{ $type }}{{ $fieldName }}(v  {{ index $specs 0 }}) {{ $type }} {
+			for i := range x {
+				if x[i].Key == {{ $type }}{{ $fieldName }}Name() {
+					x[i].Value = v
+					return x
+				}
+			}
 			return append(x, bson.E{Key: {{ $type }}{{ $fieldName }}Name(), Value: v})
 			}
 
