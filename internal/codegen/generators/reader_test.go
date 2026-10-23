@@ -11,7 +11,6 @@ import (
 )
 
 func TestRead(t *testing.T) {
-
 	x := strcase.ToSnake("FirstName")
 
 	_ = x

@@ -63,8 +63,45 @@ import (
 			return _{{ $type }}{{ $fieldName }}Name
 			}
 
-			func (x {{ $type }}) {{ $type }}{{ $fieldName }}(v  {{ $type }}{{ $fieldName }}) {{ $type }} {
+			func (x {{ $type }}) Set{{ $type }}{{ $fieldName }}(v  {{ $type }}{{ $fieldName }}) {{ $type }} {
 			return append(x, bson.E{Key: {{ $type }}{{ $fieldName }}Name(), Value: v})
+			}
+
+			func (x {{ $type }}) Get{{ $type }}{{ $fieldName }}() ({{ $type }}{{ $fieldName }}, error) {
+				for _, i := range x {
+					if i.Key != {{ $type }}{{ $fieldName }}Name() {
+						continue
+					}
+					switch t := i.Value.(type) {
+						case {{ $type }}{{ $fieldName }}: {
+							return t, nil
+						}
+						case bson.D: {
+							return {{ $type }}{{ $fieldName }}(t), nil
+						}
+						case bson.Raw: {
+							var d bson.D
+							if err := bson.Unmarshal(t, &d); err != nil {
+								return nil, err
+							}
+							return {{ $type }}{{ $fieldName }}(d), nil
+						}
+						case nil: {
+							return nil, nil
+						}
+						default: {
+							typ := reflect.TypeFor[{{ $type }}{{ $fieldName }}]()
+							return nil, bson.ValueDecoderError{ 
+								Name: {{ $type }}{{ $fieldName }}Name(), 
+								Types: []reflect.Type{typ}, 
+								Kinds: []reflect.Kind{typ.Kind()}, 
+								Received: reflect.ValueOf(t),
+							}
+						}
+					}
+				}
+
+				return nil, bsoncore.ErrElementNotFound
 			}
 
 			func {{ $type }}{{ $fieldName }}BsonE(v  {{ $type }}{{ $fieldName }}) bson.E {
@@ -82,8 +119,58 @@ import (
 			return _{{ $type }}{{ $fieldName }}Name
 			}
 
-			func (x {{ $type }}) {{ $type }}{{ $fieldName }}(v  {{ index $specs 0 }}) {{ $type }} {
+			func (x {{ $type }}) Set{{ $type }}{{ $fieldName }}(v  {{ index $specs 0 }}) {{ $type }} {
 			return append(x, bson.E{Key: {{ $type }}{{ $fieldName }}Name(), Value: v})
+			}
+
+
+			func (x {{ $type }}) Get{{ $type }}{{ $fieldName }}() ({{ index $specs 0 }}, error) {
+				for _, i := range x {
+					if i.Key != {{ $type }}{{ $fieldName }}Name() {
+						continue
+					}
+					{{ $concreteType := concreteType (index $specs 0) }}
+					{{- if eq $concreteType.Depth 0 }}
+						out, ok := i.Value.({{ index $specs 0 }})
+						if !ok {
+							var zero {{ index $specs 0 }}
+							typ := reflect.TypeFor[{{ index $specs 0 }}]()
+							return zero, bson.ValueDecoderError{ 
+								Name: {{ $type }}{{ $fieldName }}Name(), 
+								Types: []reflect.Type{typ}, 
+								Kinds: []reflect.Kind{typ.Kind()}, 
+								Received: reflect.ValueOf(i.Value),
+							}
+						}
+						return out, nil
+					{{- else }}
+					switch t := i.Value.(type) {
+						case {{ index $specs 0 }}: { 
+							return t, nil
+						}
+						case {{ $concreteType.Type }}: { 
+							return {{- range $i := $concreteType.Depth}} new( {{- end }} t {{- range $i := $concreteType.Depth}} {{- if gt $i 0}} ) {{- end}} {{- end}}), nil
+						}
+						case nil: {
+							var zero {{ index $specs 0 }}
+							return zero, nil
+						}
+						default: {
+							var zero {{ index $specs 0 }}
+							typ := reflect.TypeFor[{{ index $specs 0 }}]()
+							return zero, bson.ValueDecoderError{ 
+								Name: {{ $type }}{{ $fieldName }}Name(), 
+								Types: []reflect.Type{typ}, 
+								Kinds: []reflect.Kind{typ.Kind()}, 
+								Received: reflect.ValueOf(t),
+							}
+						}
+					}
+					{{- end }}
+				}
+
+				var zero {{ index $specs 0 }}
+				return zero, bsoncore.ErrElementNotFound
 			}
 
 			func {{ $type }}{{ $fieldName }}BsonE(v  {{ index $specs 0 }}) bson.E {

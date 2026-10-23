@@ -44,6 +44,11 @@ type (
 		ImportList  []string
 		Fields      Types
 	}
+
+	ConcreteType struct {
+		Type  string
+		Depth int
+	}
 )
 
 const (
@@ -102,13 +107,20 @@ func GoGenRender(types Types) {
 		"trimPrefix": func(in string, prefix string) string {
 			return strings.TrimPrefix(in, prefix)
 		},
+		"concreteType": func(in string) ConcreteType {
+			seq, t, found := strings.CutLast(in, "*")
+			if !found {
+				return ConcreteType{in, 0}
+			}
+			return ConcreteType{t, len(seq) + 1}
+		},
 	})
 	tmpl, err := tmpl.Parse(goGenTemplate)
 	if err != nil {
 		panic(err)
 	}
 	var buffer bytes.Buffer
-	if err := tmpl.Execute(&buffer, &GoGenModel{"test", []string{"github.com/vedadiyan/mango/tools", "go.mongodb.org/mongo-driver/v2/bson"}, types}); err != nil {
+	if err := tmpl.Execute(&buffer, &GoGenModel{"test", []string{"github.com/vedadiyan/mango/tools", "go.mongodb.org/mongo-driver/v2/bson", "go.mongodb.org/mongo-driver/v2/x/bsonx/bsoncore"}, types}); err != nil {
 		panic(err)
 	}
 	os.WriteFile("test.go", buffer.Bytes(), os.ModePerm)
