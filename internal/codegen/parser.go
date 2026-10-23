@@ -1,4 +1,4 @@
-package mango
+package codegen
 
 import (
 	"fmt"
@@ -31,13 +31,15 @@ type (
 )
 
 const (
-	ScalarType = "github.com/vedadiyan/mango/static.Scalar"
-	ObjectType = "github.com/vedadiyan/mango/static.Composite"
-	ArrayType  = "github.com/vedadiyan/mango/static.Array"
-	OneOf      = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.OneOf]"
-	AnyOf      = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.AnyOf]"
-	AllOf      = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.AllOf]"
-	Not        = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.Not]"
+	ScalarType          = "github.com/vedadiyan/mango/static.Scalar"
+	ObjectType          = "github.com/vedadiyan/mango/static.Composite"
+	ScalarArrayType     = "github.com/vedadiyan/mango/static.Array[github.com/vedadiyan/mango/static.Scalar]"
+	CompositArrayType   = "github.com/vedadiyan/mango/static.Array[github.com/vedadiyan/mango/static.Composite]"
+	PositionalArrayType = "github.com/vedadiyan/mango/static.Array[github.com/vedadiyan/mango/static.Positional]"
+	OneOf               = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.OneOf]"
+	AnyOf               = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.AnyOf]"
+	AllOf               = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.AllOf]"
+	Not                 = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.Not]"
 )
 
 func Parse(filePath string) (*ParserContext, error) {
@@ -279,6 +281,53 @@ func (r TypedParam) GetRequired() (*bool, error) {
 	return innerSchema.LookupCast[bool]("Required")
 }
 
+func (r TypedParam) GetRequiredOrFalse() (bool, error) {
+	innerSchema, err := Cast[RawSchema](r.Value)
+	if err != nil {
+		return false, err
+	}
+	value := innerSchema.Lookup("Required")
+	switch t := value.(type) {
+	case bool:
+		{
+			return t, nil
+		}
+	default:
+		{
+			return false, nil
+		}
+	}
+}
+
+func (r RawSchema) GetRequiredStringArray() ([]string, error) {
+	required := r.Lookup("Required")
+	if required == nil {
+		return nil, nil
+	}
+	switch t := required.(type) {
+	case TypedParam:
+		{
+			values, err := Cast[[]any](t.Value)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]string, 0)
+			for _, i := range *values {
+				str, err := Cast[string](i)
+				if err != nil {
+					return nil, err
+				}
+				out = append(out, *str)
+			}
+			return out, nil
+		}
+	default:
+		{
+			return nil, nil
+		}
+	}
+}
+
 func (r TypedParam) GetMinLen() (*int64, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
@@ -404,14 +453,73 @@ func (r TypedParam) GetEnum() ([]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	enum, err := innerSchema.LookupCast[[]any]("Enum")
+	enum, err := innerSchema.LookupCast[TypedParam]("Enum")
 	if err != nil {
 		return nil, err
 	}
 	if enum == nil {
 		return nil, nil
 	}
-	return *enum, nil
+	values, err := Cast[[]any](enum.Value)
+	if err != nil {
+		return nil, err
+	}
+	if values == nil {
+		return nil, nil
+	}
+	return *values, nil
+}
+
+func (r TypedParam) IsCombinator() bool {
+	switch r.TypeName {
+	case OneOf, AnyOf, AllOf, Not:
+		{
+			return true
+		}
+	default:
+		{
+			return false
+		}
+	}
+}
+
+func (r TypedParam) IsArray() bool {
+	switch r.TypeName {
+	case ScalarArrayType, CompositArrayType, PositionalArrayType:
+		{
+			return true
+		}
+	default:
+		{
+			return false
+		}
+	}
+}
+
+func (r TypedParam) IsScalar() bool {
+	switch r.TypeName {
+	case ScalarArrayType, CompositArrayType, PositionalArrayType, ObjectType, OneOf, AnyOf, AllOf, Not:
+		{
+			return false
+		}
+	default:
+		{
+			return true
+		}
+	}
+}
+
+func (r TypedParam) IsObject() bool {
+	switch r.TypeName {
+	case ObjectType:
+		{
+			return true
+		}
+	default:
+		{
+			return false
+		}
+	}
 }
 
 func (r TypedParam) GetType() ([]string, error) {
@@ -425,7 +533,7 @@ func (r TypedParam) GetType() ([]string, error) {
 		{
 			return []string{"object"}, nil
 		}
-	case ArrayType:
+	case ScalarArrayType, CompositArrayType, PositionalArrayType:
 		{
 			return []string{"array"}, nil
 		}
@@ -475,6 +583,104 @@ func (r TypedParam) GetType() ([]string, error) {
 	return out, nil
 }
 
+func (r TypedParam) GetOneOfs() (*TypedParam, error) {
+	rawSchema, err := r.GetSchema()
+	if err != nil {
+		return nil, err
+	}
+	if rawSchema == nil {
+		return nil, nil
+	}
+	oneOfs, err := rawSchema.LookupCast[TypedParam]("OneOf")
+	if err != nil {
+		return nil, err
+	}
+	return oneOfs, nil
+}
+
+func (r TypedParam) GetAnyOfs() (*TypedParam, error) {
+	rawSchema, err := r.GetSchema()
+	if err != nil {
+		return nil, err
+	}
+	if rawSchema == nil {
+		return nil, nil
+	}
+	oneOfs, err := rawSchema.LookupCast[TypedParam]("AnyOf")
+	if err != nil {
+		return nil, err
+	}
+	return oneOfs, nil
+}
+
+func (r TypedParam) GetAllOfs() (*TypedParam, error) {
+	rawSchema, err := r.GetSchema()
+	if err != nil {
+		return nil, err
+	}
+	if rawSchema == nil {
+		return nil, nil
+	}
+	oneOfs, err := rawSchema.LookupCast[TypedParam]("AllOf")
+	if err != nil {
+		return nil, err
+	}
+	return oneOfs, nil
+}
+
+func (r TypedParam) GetNots() (*TypedParam, error) {
+	rawSchema, err := r.GetSchema()
+	if err != nil {
+		return nil, err
+	}
+	if rawSchema == nil {
+		return nil, nil
+	}
+	oneOfs, err := rawSchema.LookupCast[TypedParam]("Not")
+	if err != nil {
+		return nil, err
+	}
+	return oneOfs, nil
+}
+
+func (r TypedParam) GetRootCombinators() ([]TypedParam, error) {
+	out := make([]TypedParam, 0)
+
+	if v, err := r.GetOneOfs(); err == nil {
+		if v != nil {
+			out = append(out, *v)
+		}
+	} else {
+		return nil, err
+	}
+
+	if v, err := r.GetAnyOfs(); err == nil {
+		if v != nil {
+			out = append(out, *v)
+		}
+	} else {
+		return nil, err
+	}
+
+	if v, err := r.GetAllOfs(); err == nil {
+		if v != nil {
+			out = append(out, *v)
+		}
+	} else {
+		return nil, err
+	}
+
+	if v, err := r.GetNots(); err == nil {
+		if v != nil {
+			out = append(out, *v)
+		}
+	} else {
+		return nil, err
+	}
+
+	return out, nil
+}
+
 func (r RawSchema) GetProperties() (Properties, error) {
 	typedParam, err := r.LookupCast[TypedParam]("Properties")
 	if err != nil {
@@ -499,7 +705,113 @@ func (r RawSchema) GetProperties() (Properties, error) {
 	return properties, nil
 }
 
-func (r RawSchema) GetItems() (Items, error) {
+func (r RawSchema) GetConditions() ([]map[string]any, error) {
+	typedParam, err := r.LookupCast[TypedParam]("Conditions")
+	if err != nil {
+		return nil, err
+	}
+	if typedParam == nil {
+		return nil, nil
+	}
+	items, err := CopyCast[[]any](typedParam.Value)
+	if err != nil {
+		return nil, err
+	}
+	return parseCondition(items)
+}
+
+func (r RawSchema) GetObjectName() (*string, error) {
+	return r.LookupCast[string]("ObjectName")
+}
+func parseCondition(rawSchema []any) ([]map[string]any, error) {
+	items := make([]map[string]any, 0)
+	for _, value := range rawSchema {
+		typedParam, err := Cast[TypedParam](value)
+		if err != nil {
+			return nil, err
+		}
+		if typedParam == nil {
+			continue
+		}
+		res, err := typedParam.getConditions()
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, res...)
+	}
+
+	return items, nil
+}
+
+func (r RawSchema) getConditions() (map[string]any, error) {
+	items := make(map[string]any, 0)
+	for key, value := range r {
+		switch t := value.(type) {
+		case TypedParam:
+			{
+				res, err := t.getConditions()
+				if err != nil {
+					return nil, err
+				}
+				items[key] = res
+			}
+		case RawSchema:
+			{
+				res, err := t.getConditions()
+				if err != nil {
+					return nil, err
+				}
+				items[key] = res
+			}
+		default:
+			{
+				items[key] = t
+			}
+		}
+	}
+
+	return items, nil
+}
+
+func (r TypedParam) getConditions() ([]map[string]any, error) {
+	switch t := r.Value.(type) {
+	case RawSchema:
+		{
+			res, err := t.getConditions()
+			if err != nil {
+				return nil, err
+			}
+			return []map[string]any{res}, nil
+		}
+	case []any:
+		{
+			items := make([]map[string]any, 0)
+			for _, value := range t {
+				typedParam, err := Cast[TypedParam](value)
+				if err != nil {
+					return nil, err
+				}
+				if typedParam == nil {
+					continue
+				}
+				res, err := typedParam.getConditions()
+				if err != nil {
+					return nil, err
+				}
+				items = append(items, res...)
+			}
+
+			return items, nil
+		}
+	default:
+		{
+			return nil, fmt.Errorf("unexpected case")
+		}
+	}
+
+}
+
+func (r RawSchema) GetItems() (any, error) {
 	typedParam, err := r.LookupCast[TypedParam]("Items")
 	if err != nil {
 		return nil, err
@@ -507,10 +819,41 @@ func (r RawSchema) GetItems() (Items, error) {
 	if typedParam == nil {
 		return nil, nil
 	}
-	rawSchema, err := CopyCast[[]any](typedParam.Value)
+
+	switch t := typedParam.Value.(type) {
+	case []any:
+		{
+			return r.getItemsArray(t)
+		}
+	default:
+		{
+			return *typedParam, nil
+		}
+	}
+}
+
+func (r RawSchema) GetItemsAsArray() (Items, error) {
+	typedParam, err := r.LookupCast[TypedParam]("Items")
 	if err != nil {
 		return nil, err
 	}
+	if typedParam == nil {
+		return nil, nil
+	}
+
+	switch t := typedParam.Value.(type) {
+	case []any:
+		{
+			return r.getItemsArray(t)
+		}
+	default:
+		{
+			return Items{*typedParam}, nil
+		}
+	}
+}
+
+func (r RawSchema) getItemsArray(rawSchema []any) (Items, error) {
 	items := make(Items, 0)
 	for _, value := range rawSchema {
 		typedParam, err := Cast[TypedParam](value)

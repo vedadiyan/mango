@@ -1,4 +1,11 @@
-package mango
+package generators
+
+import (
+	"encoding/json"
+	"fmt"
+
+	"github.com/vedadiyan/mango/internal/codegen"
+)
 
 type (
 	Index struct {
@@ -7,15 +14,15 @@ type (
 		Sparse     *bool
 		Background *bool
 	}
-	BsonSchema struct {
-		Title        *string                `json:"title,omitempty"`
-		Description  *string                `json:"description,omitempty"`
-		Type         []string               `json:"bsonType,omitempty"`
-		Properties   map[string]*BsonSchema `json:"properties,omitempty"`
-		Items        []*BsonSchema          `json:"items,omitempty"`
-		Required     []string               `json:"required,omitempty"`
-		Dependencies map[string][]string    `json:"dependencies,omitempty"`
-		Enum         []any                  `json:"enum,omitempty"`
+	BsonSchemaModel struct {
+		Title        *string                     `json:"title,omitempty"`
+		Description  *string                     `json:"description,omitempty"`
+		Type         []string                    `json:"bsonType,omitempty"`
+		Properties   map[string]*BsonSchemaModel `json:"properties,omitempty"`
+		Items        any                         `json:"items,omitempty"`
+		Required     []string                    `json:"required,omitempty"`
+		Dependencies map[string][]string         `json:"dependencies,omitempty"`
+		Enum         []any                       `json:"enum,omitempty"`
 
 		MinLen  *int64  `json:"minLength,omitempty"`
 		MaxLen  *int64  `json:"maxLength,omitempty"`
@@ -37,17 +44,34 @@ type (
 		AdditionalItems      *bool `json:"additionalItems,omitempty"`
 		AdditionalProperties *bool `json:"additionalProperties,omitempty"`
 
-		AnyOf []*BsonSchema `json:"anyOf,omitempty"`
-		OneOf []*BsonSchema `json:"oneOf,omitempty"`
-		AllOf []*BsonSchema `json:"allOf,omitempty"`
-		Not   *BsonSchema   `json:"Not,omitempty"`
+		AnyOf []*BsonSchemaModel `json:"anyOf,omitempty"`
+		OneOf []*BsonSchemaModel `json:"oneOf,omitempty"`
+		AllOf []*BsonSchemaModel `json:"allOf,omitempty"`
+		Not   *BsonSchemaModel   `json:"not,omitempty"`
 
 		index Index
+
+		Conditions []map[string]any `json:"-"`
 	}
 )
 
-func ToBsonSchema(in TypedParam) (*BsonSchema, error) {
-	out := &BsonSchema{}
+func ToMongoValidationSchema(in *BsonSchemaModel) (string, error) {
+	val := any(in)
+
+	if in.Conditions != nil {
+		val = map[string][]any{"$and": {in, in.Conditions}}
+	}
+
+	out, err := json.MarshalIndent(val, "", "\t")
+	if err != nil {
+		return "", err
+	}
+
+	return string(out), nil
+}
+
+func ToBsonSchema(in codegen.TypedParam) (*BsonSchemaModel, error) {
+	out := &BsonSchemaModel{}
 	typeSchema, err := in.GetSchema()
 	if err != nil {
 		return nil, err
@@ -73,6 +97,10 @@ func ToBsonSchema(in TypedParam) (*BsonSchema, error) {
 		return nil, err
 	}
 	dependencies, err := typeSchema.GetDependencies()
+	if err != nil {
+		return nil, err
+	}
+	conditions, err := typeSchema.GetConditions()
 	if err != nil {
 		return nil, err
 	}
@@ -141,6 +169,10 @@ func ToBsonSchema(in TypedParam) (*BsonSchema, error) {
 	if err != nil {
 		return nil, err
 	}
+	rootCombinators, err := in.GetRootCombinators()
+	if err != nil {
+		return nil, err
+	}
 
 	out.Title = title
 	out.Description = description
@@ -160,38 +192,64 @@ func ToBsonSchema(in TypedParam) (*BsonSchema, error) {
 	out.MinProperties = minPropertiesValue
 	out.Enum = enum
 	out.Dependencies = dependencies
+	out.Conditions = conditions
 
-	out.Properties = make(map[string]*BsonSchema)
+	out.Properties = make(map[string]*BsonSchemaModel)
+
+	required, err := typeSchema.GetRequiredStringArray()
+	if err != nil {
+		return nil, err
+	}
+	out.Required = append(out.Required, required...)
+
+	for _, rootCombinator := range rootCombinators {
+		bsonSchema, err := ToBsonSchema(rootCombinator)
+		if err != nil {
+			return nil, err
+		}
+		out.OneOf = append(out.OneOf, bsonSchema.OneOf...)
+		out.AnyOf = append(out.AnyOf, bsonSchema.AnyOf...)
+		out.AllOf = append(out.AllOf, bsonSchema.AllOf...)
+		out.Not = bsonSchema.Not
+	}
+
 	switch firstOrDefault(typ) {
 	case "oneof":
 		{
+			items := make([]*BsonSchemaModel, 0)
 			for _, item := range specs {
 				bsonSchema, err := ToBsonSchema(item)
 				if err != nil {
 					return nil, err
 				}
-				out.OneOf = append(out.Items, bsonSchema)
+				items = append(items, bsonSchema)
 			}
+			out.OneOf = items
 		}
 	case "anyof":
 		{
+			items := make([]*BsonSchemaModel, 0)
 			for _, item := range specs {
 				bsonSchema, err := ToBsonSchema(item)
 				if err != nil {
 					return nil, err
 				}
-				out.AnyOf = append(out.Items, bsonSchema)
+				items = append(items, bsonSchema)
 			}
+			out.AnyOf = items
 		}
 	case "allof":
 		{
+
+			items := make([]*BsonSchemaModel, 0)
 			for _, item := range specs {
 				bsonSchema, err := ToBsonSchema(item)
 				if err != nil {
 					return nil, err
 				}
-				out.AllOf = append(out.Items, bsonSchema)
+				items = append(items, bsonSchema)
 			}
+			out.AllOf = items
 		}
 	case "not":
 		{
@@ -211,22 +269,46 @@ func ToBsonSchema(in TypedParam) (*BsonSchema, error) {
 				if err != nil {
 					return nil, err
 				}
-				required, err := value.GetRequired()
+				required, err := value.GetRequiredOrFalse()
 				if err != nil {
 					return nil, err
 				}
-				if required != nil && *required == true {
+				if required == true {
 					out.Required = append(out.Required, key)
 				}
+
 				out.Properties[key] = bsonSchema
 			}
+			if items != nil {
 
-			for _, item := range items {
-				bsonSchema, err := ToBsonSchema(item)
-				if err != nil {
-					return nil, err
+				switch t := items.(type) {
+				case codegen.Items:
+					{
+						out.Type = []string{"array"}
+						items := make([]*BsonSchemaModel, 0)
+						for _, item := range t {
+							bsonSchema, err := ToBsonSchema(item)
+							if err != nil {
+								return nil, err
+							}
+							items = append(items, bsonSchema)
+						}
+						out.Items = items
+					}
+				case codegen.TypedParam:
+					{
+						out.Type = []string{"array"}
+						val, err := ToBsonSchema(t)
+						if err != nil {
+							return nil, err
+						}
+						out.Items = val
+					}
+				default:
+					{
+						return nil, fmt.Errorf("expected either `Items` or `TypedParam` but got `%T`", t)
+					}
 				}
-				out.Items = append(out.Items, bsonSchema)
 			}
 
 		}

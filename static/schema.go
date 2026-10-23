@@ -22,46 +22,69 @@ type (
 		ExclusiveMin bool
 		ExclusiveMax bool
 		MultipleOf   float64
-		MinLen       int
+		MinLen       uint
 		MaxLen       int
 		Pattern      string
-		Enum         []any
 		Index        Index
+
+		ObjectName string
+	}
+
+	Enum[T Int | Float | String] struct {
+		Title       string
+		Description string
+		Required    bool
+		Enum        []T
 	}
 
 	Composite struct {
 		Title                string
 		Description          string
-		Required             bool
+		Required             any
 		Properties           Properties
 		Dependencies         Dependencies
 		MaxProperties        int
 		MinProperties        int
 		AdditionalProperties bool
 		Index                Index
+
+		OneOf Combinator[OneOf]
+		AnyOf Combinator[AnyOf]
+		AllOf Combinator[AllOf]
+		Not   Combinator[Not]
+
+		ObjectName string
 	}
 
 	Combinator[T OneOf | AnyOf | AllOf | Not] struct {
 		Title       string
 		Description string
-		Required    bool
 		Specs       T
 		Index       Index
+
+		ObjectName string
 	}
 
-	Array struct {
-		Items           Items
+	Array[T Composite | Scalar] struct {
+		Required        bool
+		Items           T
 		MinItems        int
 		MaxItems        int
 		UniqueItems     bool
 		AdditionalItems bool
 		Index           Index
+
+		ObjectName string
+	}
+
+	NotCondition struct {
+		Required []string
 	}
 
 	OneOf Items
 	AnyOf Items
 	AllOf Items
-	Not   [1]Type
+	Not   [1]NotCondition
 
 	Schema struct {
 		Title        string
@@ -69,9 +92,14 @@ type (
 		Properties   Properties
 		Dependencies Dependencies
 		Conditions   Conditions
+		OneOf        Combinator[OneOf]
+		AnyOf        Combinator[AnyOf]
+		AllOf        Combinator[AllOf]
+		Not          Combinator[Not]
 	}
 
-	BasicType string
+	BasicType  string
+	BasicTypes []BasicType
 
 	Items        []Type
 	Properties   map[string]Type
@@ -79,6 +107,10 @@ type (
 
 	Condition  map[string]any
 	Conditions []Condition
+
+	Int    int64
+	Float  float64
+	String string
 )
 
 const (
@@ -104,6 +136,10 @@ func (Scalar) typ() {
 	justPanic()
 }
 
+func (Enum[T]) typ() {
+	justPanic()
+}
+
 func (Composite) typ() {
 	justPanic()
 }
@@ -112,6 +148,6 @@ func (Combinator[T]) typ() {
 	justPanic()
 }
 
-func (Array) typ() {
+func (Array[T]) typ() {
 	justPanic()
 }
