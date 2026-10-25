@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"testing"
 
 	"github.com/iancoleman/strcase"
@@ -11,6 +12,12 @@ import (
 )
 
 func TestRead(t *testing.T) {
+	pattern := `^(github\.com\/vedadiyan\/mango\/static\.Array\[)(.*)(\])`
+	regex := regexp.MustCompile(pattern)
+	res := regex.FindStringSubmatch(`github.com/vedadiyan/mango/static.Array[github.com/vedadiyan/mango/static.Scalar]`)
+
+	_ = res
+
 	x := strcase.ToSnake("FirstName")
 
 	_ = x

@@ -8,6 +8,7 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"regexp"
 	"strconv"
 )
 
@@ -31,15 +32,19 @@ type (
 )
 
 const (
-	ScalarType          = "github.com/vedadiyan/mango/static.Scalar"
-	ObjectType          = "github.com/vedadiyan/mango/static.Composite"
-	ScalarArrayType     = "github.com/vedadiyan/mango/static.Array[github.com/vedadiyan/mango/static.Scalar]"
-	CompositArrayType   = "github.com/vedadiyan/mango/static.Array[github.com/vedadiyan/mango/static.Composite]"
-	PositionalArrayType = "github.com/vedadiyan/mango/static.Array[github.com/vedadiyan/mango/static.Positional]"
-	OneOf               = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.OneOf]"
-	AnyOf               = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.AnyOf]"
-	AllOf               = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.AllOf]"
-	Not                 = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.Not]"
+	ScalarType    = "github.com/vedadiyan/mango/static.Scalar"
+	CompositeType = "github.com/vedadiyan/mango/static.Composite"
+	// ScalarArrayType     = "github.com/vedadiyan/mango/static.Array[github.com/vedadiyan/mango/static.Scalar]"
+	// CompositArrayType   = "github.com/vedadiyan/mango/static.Array[github.com/vedadiyan/mango/static.Composite]"
+	// PositionalArrayType = "github.com/vedadiyan/mango/static.Array[github.com/vedadiyan/mango/static.Positional]"
+	OneOf = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.OneOf]"
+	AnyOf = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.AnyOf]"
+	AllOf = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.AllOf]"
+	Not   = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.Not]"
+)
+
+var (
+	arrayPattern = regexp.MustCompile(`^(github\.com\/vedadiyan\/mango\/static\.Array\[)(.*)(\])`)
 )
 
 func Parse(filePath string) (*ParserContext, error) {
@@ -484,34 +489,45 @@ func (r TypedParam) IsCombinator() bool {
 }
 
 func (r TypedParam) IsArray() bool {
-	switch r.TypeName {
-	case ScalarArrayType, CompositArrayType, PositionalArrayType:
+	return isArray(r.TypeName)
+}
+
+func isArray(typeName string) bool {
+	subMatches := arrayPattern.FindStringSubmatch(typeName)
+	if len(subMatches) != 4 {
+		return false
+	}
+
+	nextToken := subMatches[2]
+
+	switch nextToken {
+	case ScalarType, CompositeType:
 		{
 			return true
 		}
 	default:
 		{
-			return false
+			return isArray(nextToken)
 		}
 	}
 }
 
-func (r TypedParam) IsScalar() bool {
-	switch r.TypeName {
-	case ScalarArrayType, CompositArrayType, PositionalArrayType, ObjectType, OneOf, AnyOf, AllOf, Not:
-		{
-			return false
-		}
-	default:
-		{
-			return true
-		}
-	}
-}
+// func (r TypedParam) IsScalar() bool {
+// 	switch r.TypeName {
+// 	case ScalarArrayType, CompositArrayType, PositionalArrayType, CompositeType, OneOf, AnyOf, AllOf, Not:
+// 		{
+// 			return false
+// 		}
+// 	default:
+// 		{
+// 			return true
+// 		}
+// 	}
+// }
 
 func (r TypedParam) IsObject() bool {
 	switch r.TypeName {
-	case ObjectType:
+	case CompositeType:
 		{
 			return true
 		}
@@ -523,19 +539,19 @@ func (r TypedParam) IsObject() bool {
 }
 
 func (r TypedParam) GetType() ([]string, error) {
+	if r.IsArray() {
+		return []string{"array"}, nil
+	}
+
 	out := make([]string, 0)
 	switch r.TypeName {
 	case ScalarType:
 		{
 			break
 		}
-	case ObjectType:
+	case CompositeType:
 		{
 			return []string{"object"}, nil
-		}
-	case ScalarArrayType, CompositArrayType, PositionalArrayType:
-		{
-			return []string{"array"}, nil
 		}
 	case OneOf:
 		{
