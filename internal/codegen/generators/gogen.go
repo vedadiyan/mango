@@ -92,13 +92,14 @@ var (
 
 func GoGenRender(types Types) {
 	tmpl := template.New("test")
-	pattern := regexp.MustCompile(`([\*\[\]]*)`)
+	splitPattern := regexp.MustCompile(`([\*\[\]]*)`)
+	arrayPattern := regexp.MustCompile(`^(\[\])+`)
 	tmpl.Funcs(template.FuncMap{
 		"hasPrefix": func(a, b string) bool {
 			return strings.HasPrefix(a, b)
 		},
 		"whichType": func(in string) string {
-			values := SplitInTwo(pattern, in)
+			values := SplitInTwo(splitPattern, in)
 			if !slices.Contains(systemTypes, values[1]) {
 				return fmt.Sprintf("%sT", values[0])
 			}
@@ -113,6 +114,13 @@ func GoGenRender(types Types) {
 				return ConcreteType{in, 0}
 			}
 			return ConcreteType{t, len(seq) + 1}
+		},
+		"isArray": func(in string) int {
+			str := arrayPattern.FindString(in)
+			if len(str) == 0 {
+				return 0
+			}
+			return len(str) / 2
 		},
 	})
 	tmpl, err := tmpl.Parse(goGenTemplate)
