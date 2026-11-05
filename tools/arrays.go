@@ -150,11 +150,11 @@ func readOptionalPrimitiveArray[T *E, E Comparable](in bson.A, typ reflect.Type)
 	return out, nil
 }
 
-func ToBsonArray[T ~[]E, E any](in T) (bson.A, error) {
-	return toBsonArray(reflect.ValueOf(in))
+func ToBsonArray[E any](in any) (bson.A, error) {
+	return toBsonArray[E](reflect.ValueOf(in))
 }
 
-func toBsonArray(in reflect.Value) (bson.A, error) {
+func toBsonArray[E any](in reflect.Value) (bson.A, error) {
 	if k := in.Kind(); k != reflect.Array && k != reflect.Slice {
 		return nil, fmt.Errorf("expected array but found non-array type")
 	}
@@ -168,7 +168,7 @@ func toBsonArray(in reflect.Value) (bson.A, error) {
 	for i := range l {
 		v := in.Index(i)
 		if isDimension {
-			res, err := toBsonArray(v)
+			res, err := toBsonArray[E](v)
 			if err != nil {
 				return nil, err
 			}
@@ -176,7 +176,8 @@ func toBsonArray(in reflect.Value) (bson.A, error) {
 			continue
 		}
 
-		out[i] = v.Interface()
+		ref := (*E)(v.UnsafePointer())
+		out[i] = *ref
 	}
 
 	return out, nil
