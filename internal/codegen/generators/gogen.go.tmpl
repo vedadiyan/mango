@@ -99,13 +99,7 @@ import (
 								return nil, nil
 							}
 							default: {
-								typ := reflect.TypeFor[{{ $type }}{{ $fieldName }}]()
-								return nil, bson.ValueDecoderError{ 
-									Name: {{ $type }}{{ $fieldName }}Name(), 
-									Types: []reflect.Type{typ}, 
-									Kinds: []reflect.Kind{typ.Kind()}, 
-									Received: reflect.ValueOf(t),
-								}
+								return nil, fmt.Errorf("unexpected BSON value type %T for field %s", t,	{{ $type }}{{ $fieldName }}Name())
 							}
 						}
 					}
