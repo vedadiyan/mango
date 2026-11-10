@@ -122,6 +122,13 @@ func GoGenRender(types Types) {
 			}
 			return len(str) / 2
 		},
+		"dict": func(values ...any) map[string]any {
+			result := make(map[string]any)
+			for i := 0; i < len(values); i += 2 {
+				result[values[i].(string)] = values[i+1]
+			}
+			return result
+		},
 	})
 	tmpl, err := tmpl.Parse(goGenTemplate)
 	if err != nil {
