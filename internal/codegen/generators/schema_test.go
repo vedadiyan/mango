@@ -19,6 +19,7 @@ func DefineExport() static.Schema {
 							},
 						},
 					},
+					AllowNull: true,
 				},
 				AllowNull: true,
 			},

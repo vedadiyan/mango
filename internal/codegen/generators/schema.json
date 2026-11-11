@@ -1,7 +1,7 @@
 {
 	"Export": {
 		"Products": [
-			"[]*[]ExportProducts",
+			"[]*[]*ExportProducts",
 			"`bson:\"Products,omitempty\"`"
 		]
 	},

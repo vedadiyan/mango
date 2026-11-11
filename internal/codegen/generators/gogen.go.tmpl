@@ -105,7 +105,7 @@ import (
 	
 	{{ $array := (isArray (index .Specs 0)) }}
 
-	{{- if eq $array 0}}
+	{{- if eq $array ""}}
 		
 		{{ $concreteType := (trimPrefix .Field "*") }}
 		{{ $isPointer := false }}
@@ -166,7 +166,7 @@ import (
 			return bson.E{Key: {{ .Name }}Name(), Value: {{- if eq $isPointer true }}*{{- end }}v}
 		}
 	{{- else }}
-		func (x {{ .Type }}) Set{{ .Name }}(v  {{- range $array }} [] {{- end }}{{ .Field }}) ({{ .Type }}, error) {
+		func (x {{ .Type }}) Set{{ .Name }}(v  {{ $array }}{{ .Field }}) ({{ .Type }}, error) {
 			for i := range x {
 				if x[i].Key == {{ .Name }}Name() {
 					x[i].Value = v
@@ -176,20 +176,20 @@ import (
 			return append(x, bson.E{Key: {{ .Name }}Name(), Value: v}), nil
 		}
 
-		func (x {{ .Type }}) Get{{ .Name }}() ({{- range $array }} [] {{- end }}{{ .Field }}, error) {
+		func (x {{ .Type }}) Get{{ .Name }}() ({{ $array }}{{ .Field }}, error) {
 			for _, i := range x {
 				if i.Key != {{ .Name }}Name() {
 					continue
 				}
 				switch t := i.Value.(type) {
-					case {{- range $array }} [] {{- end }}{{ .Field }}: {
+					case {{ $array }}{{ .Field }}: {
 						return t, nil
 					}
 					case nil: {
 						return nil, nil
 					}
 					default: {
-						var out {{- range $array }} [] {{- end }}{{ .Field }}
+						var out {{ $array }}{{ .Field }}
 						if err := tools.Copy(t, &out); err != nil { 
 							return nil, err
 						}
@@ -201,7 +201,7 @@ import (
 			return nil, bsoncore.ErrElementNotFound
 		}	
 
-		func {{ .Name }}BsonE(v  {{- range $array }} [] {{- end }}{{ .Field }}) bson.E {
+		func {{ .Name }}BsonE(v  {{ $array }}{{ .Field }}) bson.E {
 			return bson.E{Key: {{ .Name }}Name(), Value: v}
 		}		
 	{{- end }}
