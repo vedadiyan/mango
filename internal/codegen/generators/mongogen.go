@@ -70,7 +70,7 @@ func ToMongoValidationSchema(in *BsonSchemaModel) (string, error) {
 	return string(out), nil
 }
 
-func ToBsonSchema(in codegen.TypedParam, foreceOptional bool) (*BsonSchemaModel, error) {
+func ToBsonSchema(in codegen.TypedParam, forceOptional bool) (*BsonSchemaModel, error) {
 	out := &BsonSchemaModel{}
 	typeSchema, err := in.GetSchema()
 	if err != nil {
@@ -269,7 +269,7 @@ func ToBsonSchema(in codegen.TypedParam, foreceOptional bool) (*BsonSchemaModel,
 	default:
 		{
 			out.Type = typ
-			if foreceOptional {
+			if forceOptional {
 				out.Type = append(out.Type, "null")
 			}
 			for key, value := range properties {
@@ -293,7 +293,7 @@ func ToBsonSchema(in codegen.TypedParam, foreceOptional bool) (*BsonSchemaModel,
 				case codegen.Items:
 					{
 						out.Type = []string{"array"}
-						if foreceOptional {
+						if forceOptional {
 							out.Type = append(out.Type, "null")
 						}
 						items := make([]*BsonSchemaModel, 0)
@@ -309,7 +309,7 @@ func ToBsonSchema(in codegen.TypedParam, foreceOptional bool) (*BsonSchemaModel,
 				case codegen.TypedParam:
 					{
 						out.Type = []string{"array"}
-						if foreceOptional {
+						if forceOptional {
 							out.Type = append(out.Type, "null")
 						}
 						val, err := ToBsonSchema(t, allowNull)
