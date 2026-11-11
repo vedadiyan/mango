@@ -65,7 +65,7 @@ type (
 		ObjectName string
 	}
 
-	Array[T Composite | Scalar] struct {
+	Array[T Type] struct {
 		Required        bool
 		Items           T
 		MinItems        int
@@ -73,6 +73,7 @@ type (
 		UniqueItems     bool
 		AdditionalItems bool
 		Index           Index
+		AllowNull       bool
 
 		ObjectName string
 	}

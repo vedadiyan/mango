@@ -39,156 +39,37 @@ import (
 
 		{{- if hasPrefix (index $specs 0) "$" }} 
 			type {{ $type }}{{ $fieldName }}Specs struct {
-			{{ $fieldName }}  {{ trimPrefix (index $specs 0) "$" }}  {{ index $specs 1 }}
+				{{ $fieldName }}  {{ trimPrefix (index $specs 0) "$" }}  {{ index $specs 1 }}
 			}
 
 			var _{{ $type }}{{ $fieldName }}Name = tools.FieldName[{{ $type }}{{ $fieldName }}Specs]()
 
 			func {{ $type }}{{ $fieldName }}Name() string { 
-			return _{{ $type }}{{ $fieldName }}Name
+				return _{{ $type }}{{ $fieldName }}Name
 			}
 			
 			{{ continue }}
 		{{- end }}
-
+		
 		{{ $preferredType := (whichType (index $specs 0)) }}
+
 		{{- if ne $preferredType (index $specs 0) }} 
 			type {{ $type }}{{ $fieldName }}Specs[T any] struct {
-			{{ $fieldName }} {{ $preferredType }} {{ index $specs 1 }}
+				{{ $fieldName }} {{ $preferredType }} {{ index $specs 1 }}
 			}
-
 			var _{{ $type }}{{ $fieldName }}Name = tools.FieldName[{{ $type }}{{ $fieldName }}Specs[any]]()
-
-			func {{ $type }}{{ $fieldName }}Name() string { 
-			return _{{ $type }}{{ $fieldName }}Name
-			}
-
-			func (x {{ $type }}) Set{{ $type }}{{ $fieldName }}(v  {{ $type }}{{ $fieldName }}) {{ $type }} {
-			for i := range x {
-				if x[i].Key == {{ $type }}{{ $fieldName }}Name() {
-					x[i].Value = v
-					return x
-				}
-			}
-			return append(x, bson.E{Key: {{ $type }}{{ $fieldName }}Name(), Value: v})
-			}
-
-			func (x {{ $type }}) Get{{ $type }}{{ $fieldName }}() ({{ $type }}{{ $fieldName }}, error) {
-				for _, i := range x {
-					if i.Key != {{ $type }}{{ $fieldName }}Name() {
-						continue
-					}
-					switch t := i.Value.(type) {
-						case {{ $type }}{{ $fieldName }}: {
-							return t, nil
-						}
-						case bson.D: {
-							return {{ $type }}{{ $fieldName }}(t), nil
-						}
-						case bson.Raw: {
-							var d bson.D
-							if err := bson.Unmarshal(t, &d); err != nil {
-								return nil, err
-							}
-							return {{ $type }}{{ $fieldName }}(d), nil
-						}
-						case nil: {
-							return nil, nil
-						}
-						default: {
-							typ := reflect.TypeFor[{{ $type }}{{ $fieldName }}]()
-							return nil, bson.ValueDecoderError{ 
-								Name: {{ $type }}{{ $fieldName }}Name(), 
-								Types: []reflect.Type{typ}, 
-								Kinds: []reflect.Kind{typ.Kind()}, 
-								Received: reflect.ValueOf(t),
-							}
-						}
-					}
-				}
-
-				return nil, bsoncore.ErrElementNotFound
-			}
-
-			func {{ $type }}{{ $fieldName }}BsonE(v  {{ $type }}{{ $fieldName }}) bson.E {
-			return bson.E{Key: {{ $type }}{{ $fieldName }}Name(), Value: v}
-			}
+			{{ template "functions" (dict "Field" (printf "%s%s" $type $fieldName) "Name" (printf "%s%s" $type $fieldName) "Specs" $specs "Type" $type "IsBsonType" true) }}
 
 		{{- else }}
 			type {{ $type }}{{ $fieldName }}Specs struct {
-			{{ $fieldName }}  {{ index $specs 0 }}  {{ index $specs 1 }}
+				{{ $fieldName }}  {{ index $specs 0 }}  {{ index $specs 1 }}
 			}
-
 			var _{{ $type }}{{ $fieldName }}Name = tools.FieldName[{{ $type }}{{ $fieldName }}Specs]()
 
-			func {{ $type }}{{ $fieldName }}Name() string { 
-			return _{{ $type }}{{ $fieldName }}Name
-			}
-
-			func (x {{ $type }}) Set{{ $type }}{{ $fieldName }}(v  {{ index $specs 0 }}) {{ $type }} {
-			for i := range x {
-				if x[i].Key == {{ $type }}{{ $fieldName }}Name() {
-					x[i].Value = v
-					return x
-				}
-			}
-			return append(x, bson.E{Key: {{ $type }}{{ $fieldName }}Name(), Value: v})
-			}
-
-
-			func (x {{ $type }}) Get{{ $type }}{{ $fieldName }}() ({{ index $specs 0 }}, error) {
-				for _, i := range x {
-					if i.Key != {{ $type }}{{ $fieldName }}Name() {
-						continue
-					}
-					{{ $concreteType := concreteType (index $specs 0) }}
-					{{- if eq $concreteType.Depth 0 }}
-						out, ok := i.Value.({{ index $specs 0 }})
-						if !ok {
-							var zero {{ index $specs 0 }}
-							typ := reflect.TypeFor[{{ index $specs 0 }}]()
-							return zero, bson.ValueDecoderError{ 
-								Name: {{ $type }}{{ $fieldName }}Name(), 
-								Types: []reflect.Type{typ}, 
-								Kinds: []reflect.Kind{typ.Kind()}, 
-								Received: reflect.ValueOf(i.Value),
-							}
-						}
-						return out, nil
-					{{- else }}
-					switch t := i.Value.(type) {
-						case {{ index $specs 0 }}: { 
-							return t, nil
-						}
-						case {{ $concreteType.Type }}: { 
-							return {{- range $i := $concreteType.Depth}} new( {{- end }} t {{- range $i := $concreteType.Depth}} {{- if gt $i 0}} ) {{- end}} {{- end}}), nil
-						}
-						case nil: {
-							var zero {{ index $specs 0 }}
-							return zero, nil
-						}
-						default: {
-							var zero {{ index $specs 0 }}
-							typ := reflect.TypeFor[{{ index $specs 0 }}]()
-							return zero, bson.ValueDecoderError{ 
-								Name: {{ $type }}{{ $fieldName }}Name(), 
-								Types: []reflect.Type{typ}, 
-								Kinds: []reflect.Kind{typ.Kind()}, 
-								Received: reflect.ValueOf(t),
-							}
-						}
-					}
-					{{- end }}
-				}
-
-				var zero {{ index $specs 0 }}
-				return zero, bsoncore.ErrElementNotFound
-			}
-
-			func {{ $type }}{{ $fieldName }}BsonE(v  {{ index $specs 0 }}) bson.E {
-			return bson.E{Key: {{ $type }}{{ $fieldName }}Name(), Value: v}
-			}
+			{{ template "functions" (dict "Field" (index $specs 0)  "Name" (printf "%s%s" $type $fieldName) "Specs"  $specs "Type" $type "IsBsonType" false) }}
 		{{- end }}
+
+
 
 
 
@@ -214,4 +95,124 @@ import (
 	// | End Type Definition For: {{ $type }}
 	// +--------------------------------------------------+
 
+{{- end }}
+
+
+{{- define "functions" }}
+	func {{ .Name }}Name() string { 
+		return _{{ .Name }}Name
+	}
+	
+	{{ $array := (isArray (index .Specs 0)) }}
+
+	{{- if eq $array ""}}
+		
+		{{ $concreteType := (trimPrefix .Field "*") }}
+		{{ $isPointer := false }}
+		{{- if ne $concreteType .Field }} {{ $isPointer = true}} {{- end }}
+
+		func (x {{ .Type }}) Set{{ .Name }}(v  {{ .Field }}) ({{ .Type }}, error) {
+			for i := range x {
+				if x[i].Key == {{ .Name }}Name() {
+					{{- if eq $isPointer true }}
+						if v == nil {
+							x[i].Value = nil
+							return x, nil
+						}
+						x[i].Value = *v
+						return x, nil
+					{{- else }}
+						x[i].Value = v
+						return x, nil
+					{{- end }}
+				}
+			}
+			
+			{{- if eq $isPointer true }} 
+				if v == nil {
+					return append(x, bson.E{Key: {{ .Name }}Name(), Value: nil}), nil
+				}
+				return append(x, bson.E{Key: {{ .Name }}Name(), Value: *v}), nil
+			{{- else }}
+				return append(x, bson.E{Key: {{ .Name }}Name(), Value: v}), nil
+			{{- end }}
+		}
+
+		func (x {{ .Type }}) Get{{ .Name }}() ({{ .Field }}, error) {
+			for _, i := range x {
+				if i.Key != {{ .Name }}Name() {
+					continue
+				}
+				switch t := i.Value.(type) {
+					case {{ $concreteType }}: {
+						return {{- if eq $isPointer true }}&{{- end }}t, nil
+					}
+					case {{ .Field }}: {
+						return t, nil
+					}
+					{{- if eq .IsBsonType true }}
+					case bson.D: {
+						return {{ .Field }}(t), nil
+					}
+					{{- end }}
+					case nil: {
+						return nil, nil
+					}
+					default: {
+						return nil, fmt.Errorf("unexpected BSON value type %T for field %s", t,	{{ .Name }}Name())
+					}
+				}
+			}
+
+			return nil, bsoncore.ErrElementNotFound
+		}
+
+		func {{ .Name }}BsonE(v  {{ .Field }}) bson.E {
+			{{- if eq $isPointer true }}
+				if v == nil { 
+					return bson.E{Key: {{ .Name }}Name(), Value: nil}
+				}
+			{{- end }}
+			return bson.E{Key: {{ .Name }}Name(), Value: {{- if eq $isPointer true }}*{{- end }}v}
+		}
+	{{- else }}
+		func (x {{ .Type }}) Set{{ .Name }}(v  {{ $array }}{{ .Field }}) ({{ .Type }}, error) {
+			for i := range x {
+				if x[i].Key == {{ .Name }}Name() {
+					x[i].Value = v
+					return x, nil
+				}
+			}
+			return append(x, bson.E{Key: {{ .Name }}Name(), Value: v}), nil
+		}
+
+		func (x {{ .Type }}) Get{{ .Name }}() ({{ $array }}{{ .Field }}, error) {
+			for _, i := range x {
+				if i.Key != {{ .Name }}Name() {
+					continue
+				}
+				switch t := i.Value.(type) {
+					case {{ $array }}{{ .Field }}: {
+						return t, nil
+					}
+					case nil: {
+						return nil, nil
+					}
+					default: {
+						var out {{ $array }}{{ .Field }}
+						if err := tools.Copy(t, &out); err != nil { 
+							return nil, err
+						}
+						return out, nil
+					}
+				}
+			}
+
+			return nil, bsoncore.ErrElementNotFound
+		}	
+
+		func {{ .Name }}BsonE(v  {{ $array }}{{ .Field }}) bson.E {
+			return bson.E{Key: {{ .Name }}Name(), Value: v}
+		}		
+	{{- end }}
 {{- end }}

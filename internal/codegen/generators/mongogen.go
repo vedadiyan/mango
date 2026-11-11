@@ -70,7 +70,7 @@ func ToMongoValidationSchema(in *BsonSchemaModel) (string, error) {
 	return string(out), nil
 }
 
-func ToBsonSchema(in codegen.TypedParam) (*BsonSchemaModel, error) {
+func ToBsonSchema(in codegen.TypedParam, forceOptional bool) (*BsonSchemaModel, error) {
 	out := &BsonSchemaModel{}
 	typeSchema, err := in.GetSchema()
 	if err != nil {
@@ -133,6 +133,11 @@ func ToBsonSchema(in codegen.TypedParam) (*BsonSchemaModel, error) {
 		return nil, err
 	}
 	patternValue, err := in.GetPattern()
+	if err != nil {
+		return nil, err
+	}
+
+	allowNull, err := typeSchema.GetAllowNull()
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +208,7 @@ func ToBsonSchema(in codegen.TypedParam) (*BsonSchemaModel, error) {
 	out.Required = append(out.Required, required...)
 
 	for _, rootCombinator := range rootCombinators {
-		bsonSchema, err := ToBsonSchema(rootCombinator)
+		bsonSchema, err := ToBsonSchema(rootCombinator, false)
 		if err != nil {
 			return nil, err
 		}
@@ -218,7 +223,7 @@ func ToBsonSchema(in codegen.TypedParam) (*BsonSchemaModel, error) {
 		{
 			items := make([]*BsonSchemaModel, 0)
 			for _, item := range specs {
-				bsonSchema, err := ToBsonSchema(item)
+				bsonSchema, err := ToBsonSchema(item, false)
 				if err != nil {
 					return nil, err
 				}
@@ -230,7 +235,7 @@ func ToBsonSchema(in codegen.TypedParam) (*BsonSchemaModel, error) {
 		{
 			items := make([]*BsonSchemaModel, 0)
 			for _, item := range specs {
-				bsonSchema, err := ToBsonSchema(item)
+				bsonSchema, err := ToBsonSchema(item, false)
 				if err != nil {
 					return nil, err
 				}
@@ -243,7 +248,7 @@ func ToBsonSchema(in codegen.TypedParam) (*BsonSchemaModel, error) {
 
 			items := make([]*BsonSchemaModel, 0)
 			for _, item := range specs {
-				bsonSchema, err := ToBsonSchema(item)
+				bsonSchema, err := ToBsonSchema(item, false)
 				if err != nil {
 					return nil, err
 				}
@@ -254,7 +259,7 @@ func ToBsonSchema(in codegen.TypedParam) (*BsonSchemaModel, error) {
 	case "not":
 		{
 			for i := 0; i < 1 && i < len(specs); i++ {
-				bsonSchema, err := ToBsonSchema(specs[i])
+				bsonSchema, err := ToBsonSchema(specs[i], false)
 				if err != nil {
 					return nil, err
 				}
@@ -264,8 +269,11 @@ func ToBsonSchema(in codegen.TypedParam) (*BsonSchemaModel, error) {
 	default:
 		{
 			out.Type = typ
+			if forceOptional {
+				out.Type = append(out.Type, "null")
+			}
 			for key, value := range properties {
-				bsonSchema, err := ToBsonSchema(value)
+				bsonSchema, err := ToBsonSchema(value, allowNull)
 				if err != nil {
 					return nil, err
 				}
@@ -285,9 +293,12 @@ func ToBsonSchema(in codegen.TypedParam) (*BsonSchemaModel, error) {
 				case codegen.Items:
 					{
 						out.Type = []string{"array"}
+						if forceOptional {
+							out.Type = append(out.Type, "null")
+						}
 						items := make([]*BsonSchemaModel, 0)
 						for _, item := range t {
-							bsonSchema, err := ToBsonSchema(item)
+							bsonSchema, err := ToBsonSchema(item, allowNull)
 							if err != nil {
 								return nil, err
 							}
@@ -298,7 +309,10 @@ func ToBsonSchema(in codegen.TypedParam) (*BsonSchemaModel, error) {
 				case codegen.TypedParam:
 					{
 						out.Type = []string{"array"}
-						val, err := ToBsonSchema(t)
+						if forceOptional {
+							out.Type = append(out.Type, "null")
+						}
+						val, err := ToBsonSchema(t, allowNull)
 						if err != nil {
 							return nil, err
 						}

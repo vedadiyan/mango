@@ -92,13 +92,14 @@ var (
 
 func GoGenRender(types Types) {
 	tmpl := template.New("test")
-	pattern := regexp.MustCompile(`([\*\[\]]*)`)
+	splitPattern := regexp.MustCompile(`([\*\[\]]*)`)
+	arrayPattern := regexp.MustCompile(`^([\*\[\]]{2,})+`)
 	tmpl.Funcs(template.FuncMap{
 		"hasPrefix": func(a, b string) bool {
 			return strings.HasPrefix(a, b)
 		},
 		"whichType": func(in string) string {
-			values := SplitInTwo(pattern, in)
+			values := SplitInTwo(splitPattern, in)
 			if !slices.Contains(systemTypes, values[1]) {
 				return fmt.Sprintf("%sT", values[0])
 			}
@@ -113,6 +114,16 @@ func GoGenRender(types Types) {
 				return ConcreteType{in, 0}
 			}
 			return ConcreteType{t, len(seq) + 1}
+		},
+		"isArray": func(in string) string {
+			return arrayPattern.FindString(in)
+		},
+		"dict": func(values ...any) map[string]any {
+			result := make(map[string]any)
+			for i := 0; i < len(values); i += 2 {
+				result[values[i].(string)] = values[i+1]
+			}
+			return result
 		},
 	})
 	tmpl, err := tmpl.Parse(goGenTemplate)
@@ -158,7 +169,7 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 	for explicitKey, value := range properties {
 
 		if value.IsArray() {
-			res, err := ToGoArrayType(1, explicitKey, value, parents)
+			res, err := ToGoArrayType([]bool{false}, explicitKey, value, parents)
 			if err != nil {
 				return nil, err
 			}
@@ -263,7 +274,7 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 	return out, nil
 }
 
-func ToGoArrayType(dim int, explicitKey string, value codegen.TypedParam, parents []string) (Types, error) {
+func ToGoArrayType(dim []bool, explicitKey string, value codegen.TypedParam, parents []string) (Types, error) {
 	if strings.TrimSpace(explicitKey) == EmptyString {
 		return nil, fmt.Errorf("array definition requires a key")
 	}
@@ -275,6 +286,11 @@ func ToGoArrayType(dim int, explicitKey string, value codegen.TypedParam, parent
 
 	if innerSchema == nil {
 		return nil, nil
+	}
+
+	allowNull, err := innerSchema.GetAllowNull()
+	if err != nil {
+		return nil, err
 	}
 
 	items, err := innerSchema.GetItemsAsArray()
@@ -314,7 +330,7 @@ func ToGoArrayType(dim int, explicitKey string, value codegen.TypedParam, parent
 	}
 
 	if currentType.IsArray() {
-		res, err := ToGoArrayType(dim+1, identKey, items[0], parents)
+		res, err := ToGoArrayType(append(dim, allowNull), identKey, items[0], parents)
 		if err != nil {
 			return nil, err
 		}
@@ -331,9 +347,22 @@ func ToGoArrayType(dim int, explicitKey string, value codegen.TypedParam, parent
 		return nil, err
 	}
 
+	if allowNull {
+		goType = fmt.Sprintf("*%s", goType)
+	}
+
 	goTags := GetTags(explicitKey, WithOmitEmpty(!explicitRequired))
 
-	out[parentIdentKey][identKey] = [2]string{fmt.Sprintf("%s%s", strings.Repeat("[]", dim), goType), goTags}
+	arrayDimensions := ""
+	for _, value := range dim {
+		pointer := ""
+		if value {
+			pointer = "*"
+		}
+		arrayDimensions = fmt.Sprintf("%s%s[]", arrayDimensions, pointer)
+	}
+
+	out[parentIdentKey][identKey] = [2]string{fmt.Sprintf("%s%s", arrayDimensions, goType), goTags}
 	return out, nil
 }
 
@@ -397,7 +426,7 @@ func ToGoCombinatorType(explicitKey string, value codegen.TypedParam, parents []
 		innerIdentSlice := append(currentIdentSlice, innerIdentKey)
 
 		if spec.IsArray() {
-			res, err := ToGoArrayType(ZeroDimension, innerIdentKey, spec, currentIdentSlice)
+			res, err := ToGoArrayType([]bool{false}, innerIdentKey, spec, currentIdentSlice)
 			if err != nil {
 				return nil, err
 			}

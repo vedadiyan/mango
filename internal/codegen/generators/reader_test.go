@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"testing"
 
 	"github.com/iancoleman/strcase"
@@ -11,6 +12,12 @@ import (
 )
 
 func TestRead(t *testing.T) {
+	pattern := `^(github\.com\/vedadiyan\/mango\/static\.Array\[)(.*)(\])`
+	regex := regexp.MustCompile(pattern)
+	res := regex.FindStringSubmatch(`github.com/vedadiyan/mango/static.Array[github.com/vedadiyan/mango/static.Scalar]`)
+
+	_ = res
+
 	x := strcase.ToSnake("FirstName")
 
 	_ = x
@@ -19,8 +26,21 @@ func TestRead(t *testing.T) {
 		t.Error(err)
 		t.FailNow()
 	}
+
 	schemas, err := codegen.GetSchemas(pc)
 	for _, i := range schemas {
+
+		xx, err := ToBsonSchema(i.TypedParam, false)
+		if err != nil {
+			t.FailNow()
+		}
+
+		data, err := ToMongoValidationSchema(xx)
+		if err != nil {
+			t.FailNow()
+		}
+
+		fmt.Println(data)
 		value, err := ToGoTypeModel(i.TypedParam, []string{i.Name}, false)
 		if err != nil {
 			t.FailNow()
