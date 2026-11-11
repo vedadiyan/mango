@@ -114,7 +114,7 @@ import (
 		func (x {{ .Type }}) Set{{ .Name }}(v  {{ .Field }}) ({{ .Type }}, error) {
 			{{- if eq $isPointer true }}
 				if v == nil { 
-					return x, nil
+					return append(x, bson.E{Key: {{ .Name }}Name(), Value: nil}), nil
 				}
 			{{- end }}
 
@@ -124,6 +124,7 @@ import (
 					return x, nil
 				}
 			}
+			
 			return append(x, bson.E{Key: {{ .Name }}Name(), Value: {{- if eq $isPointer true }}*{{- end }}v}), nil
 		}
 
