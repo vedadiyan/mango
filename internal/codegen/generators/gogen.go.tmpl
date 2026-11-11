@@ -39,13 +39,13 @@ import (
 
 		{{- if hasPrefix (index $specs 0) "$" }} 
 			type {{ $type }}{{ $fieldName }}Specs struct {
-			{{ $fieldName }}  {{ trimPrefix (index $specs 0) "$" }}  {{ index $specs 1 }}
+				{{ $fieldName }}  {{ trimPrefix (index $specs 0) "$" }}  {{ index $specs 1 }}
 			}
 
 			var _{{ $type }}{{ $fieldName }}Name = tools.FieldName[{{ $type }}{{ $fieldName }}Specs]()
 
 			func {{ $type }}{{ $fieldName }}Name() string { 
-			return _{{ $type }}{{ $fieldName }}Name
+				return _{{ $type }}{{ $fieldName }}Name
 			}
 			
 			{{ continue }}
@@ -55,14 +55,14 @@ import (
 
 		{{- if ne $preferredType (index $specs 0) }} 
 			type {{ $type }}{{ $fieldName }}Specs[T any] struct {
-			{{ $fieldName }} {{ $preferredType }} {{ index $specs 1 }}
+				{{ $fieldName }} {{ $preferredType }} {{ index $specs 1 }}
 			}
 			var _{{ $type }}{{ $fieldName }}Name = tools.FieldName[{{ $type }}{{ $fieldName }}Specs[any]]()
 			{{ template "functions" (dict "Field" (printf "%s%s" $type $fieldName) "Name" (printf "%s%s" $type $fieldName) "Specs" $specs "Type" $type "IsBsonType" true) }}
 
 		{{- else }}
 			type {{ $type }}{{ $fieldName }}Specs struct {
-			{{ $fieldName }}  {{ index $specs 0 }}  {{ index $specs 1 }}
+				{{ $fieldName }}  {{ index $specs 0 }}  {{ index $specs 1 }}
 			}
 			var _{{ $type }}{{ $fieldName }}Name = tools.FieldName[{{ $type }}{{ $fieldName }}Specs]()
 
@@ -100,29 +100,30 @@ import (
 
 {{- define "functions" }}
 	func {{ .Name }}Name() string { 
-	return _{{ .Name }}Name
+		return _{{ .Name }}Name
 	}
 
-	{{ $array := (isArray (index .Specs 0)) }}
-	{{ $concreteType := (trimPrefix .Field "*") }}
-	{{ $isPointer := false }}
-	{{- if ne $concreteType .Field }} {{ $isPointer = true}} {{- end }}
-
 	{{- if eq $array 0}}
-		func (x {{ .Type }}) Set{{ .Name }}(v  {{ .Field }}) ({{ .Type }}, error) {
-		{{- if eq $isPointer true }}
-			if v == nil { 
-				return x, nil
-			}
-		{{- end }}
+		
+		{{ $array := (isArray (index .Specs 0)) }}
+		{{ $concreteType := (trimPrefix .Field "*") }}
+		{{ $isPointer := false }}
 
-		for i := range x {
-			if x[i].Key == {{ .Name }}Name() {
-				x[i].Value = {{- if eq $isPointer true }}*{{- end }}v
-				return x, nil
+		{{- if ne $concreteType .Field }} {{ $isPointer = true}} {{- end }}
+		func (x {{ .Type }}) Set{{ .Name }}(v  {{ .Field }}) ({{ .Type }}, error) {
+			{{- if eq $isPointer true }}
+				if v == nil { 
+					return x, nil
+				}
+			{{- end }}
+
+			for i := range x {
+				if x[i].Key == {{ .Name }}Name() {
+					x[i].Value = {{- if eq $isPointer true }}*{{- end }}v
+					return x, nil
+				}
 			}
-		}
-		return append(x, bson.E{Key: {{ .Name }}Name(), Value: {{- if eq $isPointer true }}*{{- end }}v}), nil
+			return append(x, bson.E{Key: {{ .Name }}Name(), Value: {{- if eq $isPointer true }}*{{- end }}v}), nil
 		}
 
 		func (x {{ .Type }}) Get{{ .Name }}() ({{ .Field }}, error) {
@@ -164,12 +165,12 @@ import (
 		}
 	{{- else }}
 		func (x {{ .Type }}) Set{{ .Name }}(v  {{- range $array }} [] {{- end }}{{ .Field }}) ({{ .Type }}, error) {
-		for i := range x {
-			if x[i].Key == {{ .Name }}Name() {
-				x[i].Value = v
-				return x, nil
+			for i := range x {
+				if x[i].Key == {{ .Name }}Name() {
+					x[i].Value = v
+					return x, nil
+				}
 			}
-		}
 			return append(x, bson.E{Key: {{ .Name }}Name(), Value: v}), nil
 		}
 
