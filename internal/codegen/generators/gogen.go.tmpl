@@ -52,6 +52,7 @@ import (
 		{{- end }}
 		
 		{{ $preferredType := (whichType (index $specs 0)) }}
+
 		{{- if ne $preferredType (index $specs 0) }} 
 			type {{ $type }}{{ $fieldName }}Specs[T any] struct {
 			{{ $fieldName }} {{ $preferredType }} {{ index $specs 1 }}
@@ -64,7 +65,8 @@ import (
 			{{ $fieldName }}  {{ index $specs 0 }}  {{ index $specs 1 }}
 			}
 			var _{{ $type }}{{ $fieldName }}Name = tools.FieldName[{{ $type }}{{ $fieldName }}Specs]()
-			{{ template "functions" (dict "Field" (index $specs 0)  "Name" (printf "%s%s" $type $fieldName)  "Specs"  $specs "Type" $type "IsBsonType" false) }}
+
+			{{ template "functions" (dict "Field" (index $specs 0)  "Name" (printf "%s%s" $type $fieldName) "Specs"  $specs "Type" $type "IsBsonType" false) }}
 		{{- end }}
 
 
@@ -102,16 +104,25 @@ import (
 	}
 
 	{{ $array := (isArray (index .Specs 0)) }}
+	{{ $concreteType := (trimPrefix .Field "*") }}
+	{{ $isPointer := false }}
+	{{- if ne $concreteType .Field }} {{ $isPointer = true}} {{- end }}
 
 	{{- if eq $array 0}}
 		func (x {{ .Type }}) Set{{ .Name }}(v  {{ .Field }}) ({{ .Type }}, error) {
+		{{- if eq $isPointer true }}
+			if v == nil { 
+				return x, nil
+			}
+		{{- end }}
+
 		for i := range x {
 			if x[i].Key == {{ .Name }}Name() {
-				x[i].Value = v
+				x[i].Value = {{- if eq $isPointer true }}*{{- end }}v
 				return x, nil
 			}
 		}
-		return append(x, bson.E{Key: {{ .Name }}Name(), Value: v}), nil
+		return append(x, bson.E{Key: {{ .Name }}Name(), Value: {{- if eq $isPointer true }}*{{- end }}v}), nil
 		}
 
 		func (x {{ .Type }}) Get{{ .Name }}() ({{ .Field }}, error) {
@@ -120,6 +131,9 @@ import (
 					continue
 				}
 				switch t := i.Value.(type) {
+					case {{ $concreteType }}: {
+						return {{- if eq $isPointer true }}&{{- end }}t, nil
+					}
 					case {{ .Field }}: {
 						return t, nil
 					}
@@ -141,7 +155,12 @@ import (
 		}
 
 		func {{ .Name }}BsonE(v  {{ .Field }}) bson.E {
-			return bson.E{Key: {{ .Name }}Name(), Value: v}
+			{{- if eq $isPointer true }}
+				if v == nil { 
+					return bson.E{Key: {{ .Name }}Name(), Value: nil}
+				}
+			{{- end }}
+			return bson.E{Key: {{ .Name }}Name(), Value: {{- if eq $isPointer true }}*{{- end }}v}
 		}
 	{{- else }}
 		func (x {{ .Type }}) Set{{ .Name }}(v  {{- range $array }} [] {{- end }}{{ .Field }}) ({{ .Type }}, error) {
