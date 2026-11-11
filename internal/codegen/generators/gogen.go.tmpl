@@ -102,14 +102,15 @@ import (
 	func {{ .Name }}Name() string { 
 		return _{{ .Name }}Name
 	}
+	
+	{{ $array := (isArray (index .Specs 0)) }}
 
 	{{- if eq $array 0}}
 		
-		{{ $array := (isArray (index .Specs 0)) }}
 		{{ $concreteType := (trimPrefix .Field "*") }}
 		{{ $isPointer := false }}
 		{{- if ne $concreteType .Field }} {{ $isPointer = true}} {{- end }}
-		
+
 		func (x {{ .Type }}) Set{{ .Name }}(v  {{ .Field }}) ({{ .Type }}, error) {
 			{{- if eq $isPointer true }}
 				if v == nil { 
