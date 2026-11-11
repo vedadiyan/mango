@@ -73,6 +73,7 @@ type (
 		UniqueItems     bool
 		AdditionalItems bool
 		Index           Index
+		AllowNull       bool
 
 		ObjectName string
 	}

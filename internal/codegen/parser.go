@@ -848,6 +848,18 @@ func (r RawSchema) GetItems() (any, error) {
 	}
 }
 
+func (r RawSchema) GetAllowNull() (bool, error) {
+	value, err := r.LookupCast[bool]("AllowNull")
+	if err != nil {
+		return false, err
+	}
+	if value == nil {
+		return false, nil
+	}
+
+	return *value, nil
+}
+
 func (r RawSchema) GetItemsAsArray() (Items, error) {
 	typedParam, err := r.LookupCast[TypedParam]("Items")
 	if err != nil {
