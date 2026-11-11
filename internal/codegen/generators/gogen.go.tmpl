@@ -199,7 +199,6 @@ import (
 			return nil, bsoncore.ErrElementNotFound
 		}	
 
-
 		func {{ .Name }}BsonE(v  {{ .Field }}) bson.E {
 			return bson.E{Key: {{ .Name }}Name(), Value: v}
 		}		
