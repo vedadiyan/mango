@@ -112,20 +112,30 @@ import (
 		{{- if ne $concreteType .Field }} {{ $isPointer = true}} {{- end }}
 
 		func (x {{ .Type }}) Set{{ .Name }}(v  {{ .Field }}) ({{ .Type }}, error) {
-			{{- if eq $isPointer true }}
-				if v == nil { 
-					return append(x, bson.E{Key: {{ .Name }}Name(), Value: nil}), nil
-				}
-			{{- end }}
-
 			for i := range x {
 				if x[i].Key == {{ .Name }}Name() {
-					x[i].Value = {{- if eq $isPointer true }}*{{- end }}v
-					return x, nil
+					{{- if eq $isPointer true }}
+						if v == nil {
+							x[i].Value = nil
+							return x, nil
+						}
+						x[i].Value = *v
+						return x, nil
+					{{- else }}
+						x[i].Value = v
+						return x, nil
+					{{- end }}
 				}
 			}
 			
-			return append(x, bson.E{Key: {{ .Name }}Name(), Value: {{- if eq $isPointer true }}*{{- end }}v}), nil
+			{{- if eq $isPointer true }} 
+				if v == nil {
+					return append(x, bson.E{Key: {{ .Name }}Name(), Value: nil}), nil
+				}
+				return append(x, bson.E{Key: {{ .Name }}Name(), Value: *v}), nil
+			{{- else }}
+				return append(x, bson.E{Key: {{ .Name }}Name(), Value: v}), nil
+			{{- end }}
 		}
 
 		func (x {{ .Type }}) Get{{ .Name }}() ({{ .Field }}, error) {
