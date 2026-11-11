@@ -200,7 +200,7 @@ import (
 			return nil, bsoncore.ErrElementNotFound
 		}	
 
-		func {{ .Name }}BsonE(v  {{ .Field }}) bson.E {
+		func {{ .Name }}BsonE(v  {{- range $array }} [] {{- end }}{{ .Field }}) bson.E {
 			return bson.E{Key: {{ .Name }}Name(), Value: v}
 		}		
 	{{- end }}
