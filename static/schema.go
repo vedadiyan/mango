@@ -127,6 +127,7 @@ const (
 	TypeTimeStamp  BasicType = "timestamp"
 	TypeLong       BasicType = "long"
 	TypeDecimal    BasicType = "decimal"
+	TypeObject     BasicType = "object"
 )
 
 func justPanic() {

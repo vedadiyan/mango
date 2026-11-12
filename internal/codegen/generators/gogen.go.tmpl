@@ -51,14 +51,23 @@ import (
 			{{ continue }}
 		{{- end }}
 		
-		{{ $preferredType := (whichType (index $specs 0)) }}
+		{{ $genericType := (genericType (index $specs 0)) }}
+		{{ $name :=  (printf "%s%s" $type $fieldName) }}
 
-		{{- if ne $preferredType (index $specs 0) }} 
+		{{- if ne $genericType (index $specs 0) }} 
 			type {{ $type }}{{ $fieldName }}Specs[T any] struct {
-				{{ $fieldName }} {{ $preferredType }} {{ index $specs 1 }}
+				{{ $fieldName }} {{ $genericType }} {{ index $specs 1 }}
 			}
 			var _{{ $type }}{{ $fieldName }}Name = tools.FieldName[{{ $type }}{{ $fieldName }}Specs[any]]()
-			{{ template "functions" (dict "Field" (printf "%s%s" $type $fieldName) "Name" (printf "%s%s" $type $fieldName) "Specs" $specs "Type" $type "IsBsonType" true) }}
+			{{ template "functions" (
+				dict 
+					"Field" 		(printf "%s%s" $type $fieldName) 
+					"Name" 			$name
+					"Specs" 		$specs 
+					"Type" 			$type 
+					"IsBsonType" 	true
+				) 
+			}}
 
 		{{- else }}
 			type {{ $type }}{{ $fieldName }}Specs struct {
@@ -66,24 +75,17 @@ import (
 			}
 			var _{{ $type }}{{ $fieldName }}Name = tools.FieldName[{{ $type }}{{ $fieldName }}Specs]()
 
-			{{ template "functions" (dict "Field" (index $specs 0)  "Name" (printf "%s%s" $type $fieldName) "Specs"  $specs "Type" $type "IsBsonType" false) }}
+			{{ template "functions" (
+				dict 
+					"Field" 		(index $specs 0)  
+					"Name" 			$name
+					"Specs" 		$specs 
+					"Type" 			$type 
+					"IsBsonType" 	false
+				) 
+			}}
+
 		{{- end }}
-
-
-
-
-
-		{{/* 
-        func {{ $fieldName }}(v {{ index $specs 0 }}) {{ $type }} {
-            return {{ $type }}(bson.E{Key: {{ $fieldName }}Name(), Value: v})
-        }
-        
-        func {{ $fieldName }}IfPresent(v {{- if not (hasPrefix (index $specs 0) "*") }} *{{- end}} {{- index $specs 0 }}) {{ $type }} {
-            if v == nil {
-                return {{ $type }}(bson.E{})
-            }
-            return {{ $type }}(bson.E{Key: {{ $fieldName }}Name(), Value: v})
-        } */}}
 
 		// +--------------------------------------------------+
 		// |    End Field Definition For: {{ $fieldName }}
@@ -103,13 +105,13 @@ import (
 		return _{{ .Name }}Name
 	}
 	
-	{{ $array := (isArray (index .Specs 0)) }}
+	{{ $array := (arraySymbol (index .Specs 0)) }}
 
 	{{- if eq $array ""}}
 		
-		{{ $concreteType := (trimPrefix .Field "*") }}
+		{{ $indirectType := (trimPrefix .Field "*") }}
 		{{ $isPointer := false }}
-		{{- if ne $concreteType .Field }} {{ $isPointer = true}} {{- end }}
+		{{- if ne $indirectType .Field }} {{ $isPointer = true}} {{- end }}
 
 		func (x {{ .Type }}) Set{{ .Name }}(v  {{ .Field }}) ({{ .Type }}, error) {
 			for i := range x {
@@ -144,7 +146,7 @@ import (
 					continue
 				}
 				switch t := i.Value.(type) {
-					case {{ $concreteType }}: {
+					case {{ $indirectType }}: {
 						return {{- if eq $isPointer true }}&{{- end }}t, nil
 					}
 					case {{ .Field }}: {

@@ -30,7 +30,7 @@ func TestRead(t *testing.T) {
 	schemas, err := codegen.GetSchemas(pc)
 	for _, i := range schemas {
 
-		xx, err := ToBsonSchema(i.TypedParam, false)
+		xx, err := ToBsonSchema(i.TypedParam)
 		if err != nil {
 			t.FailNow()
 		}
@@ -45,7 +45,7 @@ func TestRead(t *testing.T) {
 		if err != nil {
 			t.FailNow()
 		}
-		GoGenRender(value)
+		GoGenRender("test", "generators", value)
 		json, err := json.MarshalIndent(value, "", "\t")
 		if err != nil {
 			t.FailNow()

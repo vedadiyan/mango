@@ -52,8 +52,7 @@ type (
 )
 
 const (
-	EmptyString   = ""
-	ZeroDimension = 0
+	EmptyString = ""
 
 	CombinatorTypeInavlid CombinatorType = "Invalid"
 	CombinatorTypeOneOf   CombinatorType = "OneOf"
@@ -62,43 +61,78 @@ const (
 	CombinatorTypeNot     CombinatorType = "Not"
 )
 
+const (
+	TimeType       = "time.Time"
+	ObjectIdType   = "bson.ObjectID"
+	BsonAType      = "bson.A"
+	BsonEType      = "bson.E"
+	BsonDType      = "bson.D"
+	BsonMType      = "bson.M"
+	BoolType       = "bool"
+	IntType        = "int"
+	Int8Type       = "int8"
+	Int16Type      = "int16"
+	Int32Type      = "int32"
+	Int64Type      = "int64"
+	UintType       = "uint"
+	Uint8Type      = "uint8"
+	Uint16Type     = "uint16"
+	Uint32Type     = "uint32"
+	Uint64Type     = "uint64"
+	Float32Type    = "float32"
+	Float64Type    = "float64"
+	Complex64Type  = "complex64"
+	Complex128Type = "complex128"
+	StringType     = "string"
+	ByteType       = "byte"
+	RuneType       = "rune"
+	BinaryType     = "[]byte"
+	AnyType        = "any"
+)
+
 var (
 	//go:embed gogen.go.tmpl
 	goGenTemplate string
-	opaqueTypes   = []string{"time.Time", "bson.ObjectID"}
-	systemTypes   = []string{
-		"bool",
-		"int",
-		"int8",
-		"int16",
-		"int32",
-		"int64",
-		"uint",
-		"uint8",
-		"uint16",
-		"uint32",
-		"uint64",
-		"float32",
-		"float64",
-		"complex64",
-		"complex128",
-		"string",
-		"byte",
-		"rune",
-		"time.Time",
-		"bson.ObjectID",
+	opaqueTypes   = []string{
+		TimeType,
+		ObjectIdType,
+		BsonAType,
+		BsonEType,
+		BsonDType,
+		BsonMType,
+	}
+	systemTypes = []string{
+		BoolType,
+		IntType,
+		Int8Type,
+		Int16Type,
+		Int32Type,
+		Int64Type,
+		UintType,
+		Uint8Type,
+		Uint16Type,
+		Uint32Type,
+		Uint64Type,
+		Float32Type,
+		Float64Type,
+		Complex64Type,
+		Complex128Type,
+		StringType,
+		ByteType,
+		RuneType,
+		TimeType,
+		ObjectIdType,
 	}
 )
 
-func GoGenRender(types Types) {
-	tmpl := template.New("test")
+func TemplateFunctions() template.FuncMap {
 	splitPattern := regexp.MustCompile(`([\*\[\]]*)`)
 	arrayPattern := regexp.MustCompile(`^([\*\[\]]{2,})+`)
-	tmpl.Funcs(template.FuncMap{
+	return template.FuncMap{
 		"hasPrefix": func(a, b string) bool {
 			return strings.HasPrefix(a, b)
 		},
-		"whichType": func(in string) string {
+		"genericType": func(in string) string {
 			values := SplitInTwo(splitPattern, in)
 			if !slices.Contains(systemTypes, values[1]) {
 				return fmt.Sprintf("%sT", values[0])
@@ -108,14 +142,7 @@ func GoGenRender(types Types) {
 		"trimPrefix": func(in string, prefix string) string {
 			return strings.TrimPrefix(in, prefix)
 		},
-		"concreteType": func(in string) ConcreteType {
-			seq, t, found := strings.CutLast(in, "*")
-			if !found {
-				return ConcreteType{in, 0}
-			}
-			return ConcreteType{t, len(seq) + 1}
-		},
-		"isArray": func(in string) string {
+		"arraySymbol": func(in string) string {
 			return arrayPattern.FindString(in)
 		},
 		"dict": func(values ...any) map[string]any {
@@ -125,16 +152,27 @@ func GoGenRender(types Types) {
 			}
 			return result
 		},
-	})
+	}
+}
+
+func GoGenRender(fileName string, packageName string, types Types) {
+	tmpl := template.New(uuid.New().String())
+	tmpl.Funcs(TemplateFunctions())
 	tmpl, err := tmpl.Parse(goGenTemplate)
 	if err != nil {
 		panic(err)
 	}
 	var buffer bytes.Buffer
-	if err := tmpl.Execute(&buffer, &GoGenModel{"test", []string{"github.com/vedadiyan/mango/tools", "go.mongodb.org/mongo-driver/v2/bson", "go.mongodb.org/mongo-driver/v2/x/bsonx/bsoncore"}, types}); err != nil {
+	imports := []string{
+		"fmt",
+		"github.com/vedadiyan/mango/tools",
+		"go.mongodb.org/mongo-driver/v2/bson",
+		"go.mongodb.org/mongo-driver/v2/x/bsonx/bsoncore",
+	}
+	if err := tmpl.Execute(&buffer, &GoGenModel{packageName, imports, types}); err != nil {
 		panic(err)
 	}
-	os.WriteFile("test.go", buffer.Bytes(), os.ModePerm)
+	os.WriteFile(fmt.Sprintf("%s.autogen.go", fileName), buffer.Bytes(), os.ModePerm)
 }
 
 func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) (Types, error) {
@@ -501,41 +539,41 @@ func GetGoType(in []string, name string, opts ...GoTypeOption) (string, error) {
 			{
 				options.optional = "*"
 			}
-		case "object":
+		case static.TypeObject:
 			{
 				typ = name
 			}
 		case static.TypeBinary:
 			{
-				typ = "[]byte"
+				typ = BinaryType
 			}
 		case static.TypeBool:
 			{
-				typ = "bool"
+				typ = BoolType
 			}
 		case static.TypeDecimal, static.TypeDouble:
 			{
-				typ = "float64"
+				typ = Float64Type
 			}
 		case static.TypeInt:
 			{
-				typ = "int32"
+				typ = Int32Type
 			}
 		case static.TypeLong:
 			{
-				typ = "int64"
+				typ = Int64Type
 			}
 		case static.TypeString, static.TypeJavaScript, static.TypeRegex:
 			{
-				typ = "string"
+				typ = StringType
 			}
 		case static.TypeTimeStamp:
 			{
-				typ = "time.Time"
+				typ = TimeType
 			}
 		case static.TypeObjectId:
 			{
-				typ = "bson.ObjectID"
+				typ = ObjectIdType
 			}
 		default:
 			{
@@ -545,7 +583,7 @@ func GetGoType(in []string, name string, opts ...GoTypeOption) (string, error) {
 	}
 
 	if strings.TrimSpace(typ) == EmptyString {
-		return "any", nil
+		return AnyType, nil
 	}
 
 	return fmt.Sprintf("%s%s", options.optional, typ), nil
