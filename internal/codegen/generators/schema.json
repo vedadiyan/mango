@@ -7,8 +7,8 @@
 	},
 	"ExportProducts": {
 		"Name": [
-			"*string",
-			"`bson:\"Name,omitempty\"`"
+			"string",
+			"`bson:\"Name\"`"
 		]
 	}
 }

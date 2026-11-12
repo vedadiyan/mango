@@ -15,7 +15,8 @@ func DefineExport() static.Schema {
 					Items: static.Composite{
 						Properties: static.Properties{
 							"Name": static.Scalar{
-								Type: static.BasicTypes{static.TypeString},
+								Required: true,
+								Type:     static.BasicTypes{static.TypeString},
 							},
 						},
 					},

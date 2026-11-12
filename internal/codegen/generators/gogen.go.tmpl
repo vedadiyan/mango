@@ -113,42 +113,63 @@ import (
 		{{ $isPointer := false }}
 		{{- if ne $indirectType .Field }} {{ $isPointer = true}} {{- end }}
 
-		func (x {{ .Type }}) Set{{ .Name }}(v  {{ .Field }}) ({{ .Type }}, error) {
-			for i := range x {
-				if x[i].Key == {{ .Name }}Name() {
-					{{- if eq $isPointer true }}
+		{{- if eq $isPointer true }}
+			func (x {{ .Type }}) Set{{ .Name }}(v  {{ .Field }}) ({{ .Type }}, error) {
+				for i := range x {
+					if x[i].Key == {{ .Name }}Name() {
 						if v == nil {
 							x[i].Value = nil
 							return x, nil
 						}
 						x[i].Value = *v
 						return x, nil
-					{{- else }}
-						x[i].Value = v
-						return x, nil
-					{{- end }}
+					}
 				}
-			}
-			
-			{{- if eq $isPointer true }} 
+				
 				if v == nil {
 					return append(x, bson.E{Key: {{ .Name }}Name(), Value: nil}), nil
 				}
 				return append(x, bson.E{Key: {{ .Name }}Name(), Value: *v}), nil
-			{{- else }}
+			}		
+		{{- else }}
+			func (x {{ .Type }}) Set{{ .Name }}(v  {{ .Field }}) ({{ .Type }}, error) {
+				for i := range x {
+					if x[i].Key == {{ .Name }}Name() {
+						x[i].Value = v
+						return x, nil
+					}
+				}
 				return append(x, bson.E{Key: {{ .Name }}Name(), Value: v}), nil
-			{{- end }}
-		}
+			}				
+		{{- end }}
+
+		{{- if or (eq $isPointer true) (eq .IsBsonType true)}}
+
+			func (x {{ .Type }}) Set{{ .Name }}IfPresent(v  {{ .Field }}) ({{ .Type }}, error) {
+				if v == nil { 
+					return x, nil
+				}
+				
+				return x.Set{{ .Name }}(v)
+			}				
+		{{- end }}
 
 		func (x {{ .Type }}) Get{{ .Name }}() ({{ .Field }}, error) {
+			{{- if eq $isPointer true }}
+				zero := nil
+			{{- else }}
+				var zero {{ .Field }}
+			{{- end }} 
 			for _, i := range x {
 				if i.Key != {{ .Name }}Name() {
 					continue
 				}
 				switch t := i.Value.(type) {
+					{{- if eq $isPointer true }}
 					case {{ $indirectType }}: {
-						return {{- if eq $isPointer true }}&{{- end }}t, nil
+						return &t, nil
 					}
+					{{- end }}
 					case {{ .Field }}: {
 						return t, nil
 					}
@@ -157,16 +178,18 @@ import (
 						return {{ .Field }}(t), nil
 					}
 					{{- end }}
+					{{- if or (eq $isPointer true) (eq .IsBsonType true)}}
 					case nil: {
-						return nil, nil
+						return zero, nil
 					}
+					{{- end }}
 					default: {
-						return nil, fmt.Errorf("unexpected BSON value type %T for field %s", t,	{{ .Name }}Name())
+						return zero, fmt.Errorf("unexpected BSON value type %T for field %s", t,	{{ .Name }}Name())
 					}
 				}
 			}
 
-			return nil, bsoncore.ErrElementNotFound
+			return zero, bsoncore.ErrElementNotFound
 		}
 
 		func {{ .Name }}BsonE(v  {{ .Field }}) bson.E {
@@ -179,6 +202,20 @@ import (
 		}
 	{{- else }}
 		func (x {{ .Type }}) Set{{ .Name }}(v  {{ $array }}{{ .Field }}) ({{ .Type }}, error) {
+			for i := range x {
+				if x[i].Key == {{ .Name }}Name() {
+					x[i].Value = v
+					return x, nil
+				}
+			}
+			return append(x, bson.E{Key: {{ .Name }}Name(), Value: v}), nil
+		}
+
+		func (x {{ .Type }}) Set{{ .Name }}IfPresent(v  {{ $array }}{{ .Field }}) ({{ .Type }}, error) {
+			if v == nil {
+				return x, nil
+			}
+
 			for i := range x {
 				if x[i].Key == {{ .Name }}Name() {
 					x[i].Value = v
