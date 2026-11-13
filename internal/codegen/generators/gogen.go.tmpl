@@ -33,6 +33,10 @@ import (
 	type {{ $type }}Type[T any] struct {
 		Root T `bson:"inline"`
 	} 
+
+	func New{{ $type }} () {{ $type }} {
+		return make({{ $type }}, 0)
+	}
 	
 	{{- range $fieldName, $specs := $fields }}
 
@@ -118,40 +122,40 @@ import (
 		{{- if ne $indirectType .Field }} {{ $isPointer = true}} {{- end }}
 
 		{{- if eq $isPointer true }}
-			func (x {{ .Type }}) Set{{ .Name }}(v  {{ .Field }}) ({{ .Type }}, error) {
+			func (x {{ .Type }}) Set{{ .Name }}(v  {{ .Field }}) {{ .Type }} {
 				for i := range x {
 					if x[i].Key == {{ .Name }}Name() {
 						if v == nil {
 							x[i].Value = nil
-							return x, nil
+							return x
 						}
 						x[i].Value = *v
-						return x, nil
+						return x
 					}
 				}
 				
 				if v == nil {
-					return append(x, bson.E{Key: {{ .Name }}Name(), Value: nil}), nil
+					return append(x, bson.E{Key: {{ .Name }}Name(), Value: nil})
 				}
-				return append(x, bson.E{Key: {{ .Name }}Name(), Value: *v}), nil
+				return append(x, bson.E{Key: {{ .Name }}Name(), Value: *v})
 			}		
 		{{- else }}
-			func (x {{ .Type }}) Set{{ .Name }}(v  {{ .Field }}) ({{ .Type }}, error) {
+			func (x {{ .Type }}) Set{{ .Name }}(v  {{ .Field }}) {{ .Type }} {
 				for i := range x {
 					if x[i].Key == {{ .Name }}Name() {
 						x[i].Value = v
-						return x, nil
+						return x
 					}
 				}
-				return append(x, bson.E{Key: {{ .Name }}Name(), Value: v}), nil
+				return append(x, bson.E{Key: {{ .Name }}Name(), Value: v})
 			}				
 		{{- end }}
 
 		{{- if or (eq $isPointer true) (eq .IsBsonType true)}}
 
-			func (x {{ .Type }}) Set{{ .Name }}IfPresent(v  {{ .Field }}) ({{ .Type }}, error) {
+			func (x {{ .Type }}) Set{{ .Name }}IfPresent(v  {{ .Field }}) {{ .Type }} {
 				if v == nil { 
-					return x, nil
+					return x
 				}
 				
 				return x.Set{{ .Name }}(v)
@@ -201,28 +205,28 @@ import (
 			return bson.E{Key: {{ .Name }}Name(), Value: {{- if eq $isPointer true }}*{{- end }}v}
 		}
 	{{- else }}
-		func (x {{ .Type }}) Set{{ .Name }}(v  {{ $array }}{{ .Field }}) ({{ .Type }}, error) {
+		func (x {{ .Type }}) Set{{ .Name }}(v  {{ $array }}{{ .Field }}) {{ .Type }} {
 			for i := range x {
 				if x[i].Key == {{ .Name }}Name() {
 					x[i].Value = v
-					return x, nil
+					return x
 				}
 			}
-			return append(x, bson.E{Key: {{ .Name }}Name(), Value: v}), nil
+			return append(x, bson.E{Key: {{ .Name }}Name(), Value: v})
 		}
 
-		func (x {{ .Type }}) Set{{ .Name }}IfPresent(v  {{ $array }}{{ .Field }}) ({{ .Type }}, error) {
+		func (x {{ .Type }}) Set{{ .Name }}IfPresent(v  {{ $array }}{{ .Field }}) {{ .Type }} {
 			if v == nil {
-				return x, nil
+				return x
 			}
 
 			for i := range x {
 				if x[i].Key == {{ .Name }}Name() {
 					x[i].Value = v
-					return x, nil
+					return x
 				}
 			}
-			return append(x, bson.E{Key: {{ .Name }}Name(), Value: v}), nil
+			return append(x, bson.E{Key: {{ .Name }}Name(), Value: v})
 		}
 
 		func (x {{ .Type }}) Get{{ .Name }}() ({{ $array }}{{ .Field }}, error) {
