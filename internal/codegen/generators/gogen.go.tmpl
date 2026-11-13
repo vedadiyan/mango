@@ -29,6 +29,10 @@ import (
 	// +--------------------------------------------------+
 
 	type {{ $type }} bson.D
+
+	type {{ $type }}Type[T any] struct {
+		Root T `bson:"inline"`
+	}
 	
 	{{- range $fieldName, $specs := $fields }}
 
@@ -51,8 +55,8 @@ import (
 			{{ continue }}
 		{{- end }}
 		
-		{{ $genericType := (genericType (index $specs 0)) }}
 		{{ $name :=  (printf "%s%s" $type $fieldName) }}
+		{{ $genericType := (genericType (index $specs 0) (printf "%sType" $name) ) }}
 
 		{{- if ne $genericType (index $specs 0) }} 
 			type {{ $type }}{{ $fieldName }}Specs[T any] struct {
@@ -61,7 +65,7 @@ import (
 			var _{{ $type }}{{ $fieldName }}Name = tools.FieldName[{{ $type }}{{ $fieldName }}Specs[any]]()
 			{{ template "functions" (
 				dict 
-					"Field" 		(printf "%s%s" $type $fieldName) 
+					"Field" 		$name
 					"Name" 			$name
 					"Specs" 		$specs 
 					"Type" 			$type 

@@ -36,12 +36,6 @@ type (
 	GoTypeOption func(*GoTypeOptions)
 	GoTagOption  func(*[]string)
 
-	Field struct {
-		Name string
-		Type string
-		Tags string
-	}
-
 	GoGenModel struct {
 		PackageName string
 		ImportList  []string
@@ -135,10 +129,10 @@ func TemplateFunctions() template.FuncMap {
 		"hasPrefix": func(a, b string) bool {
 			return strings.HasPrefix(a, b)
 		},
-		"genericType": func(in string) string {
+		"genericType": func(in string, specs string) string {
 			values := SplitInTwo(splitPattern, in)
 			if !slices.Contains(systemTypes, values[1]) {
-				return fmt.Sprintf("%sT", values[0])
+				return fmt.Sprintf("%s%s[T]", values[0], specs)
 			}
 			return in
 		},
