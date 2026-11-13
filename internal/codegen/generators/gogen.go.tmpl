@@ -29,6 +29,10 @@ import (
 	// +--------------------------------------------------+
 
 	type {{ $type }} bson.D
+
+	type {{ $type }}Type[T any] struct {
+		Root T `bson:"inline"`
+	} 
 	
 	{{- range $fieldName, $specs := $fields }}
 
