@@ -45,7 +45,7 @@ func TestRead(t *testing.T) {
 		if err != nil {
 			t.FailNow()
 		}
-		GoGenRender("test", "generators", value)
+		GoGenRender("./", "test", "generators", value)
 		json, err := json.MarshalIndent(value, "", "\t")
 		if err != nil {
 			t.FailNow()

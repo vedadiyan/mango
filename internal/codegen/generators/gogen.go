@@ -2,14 +2,17 @@ package generators
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"fmt"
 	"maps"
 	"os"
+	"os/exec"
 	"regexp"
 	"slices"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/iancoleman/strcase"
@@ -155,7 +158,7 @@ func TemplateFunctions() template.FuncMap {
 	}
 }
 
-func GoGenRender(fileName string, packageName string, types Types) {
+func GoGenRender(dir string, fileName string, packageName string, types Types) {
 	tmpl := template.New(uuid.New().String())
 	tmpl.Funcs(TemplateFunctions())
 	tmpl, err := tmpl.Parse(goGenTemplate)
@@ -172,7 +175,11 @@ func GoGenRender(fileName string, packageName string, types Types) {
 	if err := tmpl.Execute(&buffer, &GoGenModel{packageName, imports, types}); err != nil {
 		panic(err)
 	}
-	os.WriteFile(fmt.Sprintf("%s.autogen.go", fileName), buffer.Bytes(), os.ModePerm)
+	dest := fmt.Sprintf("%s.autogen.go", fileName)
+	os.WriteFile(dest, buffer.Bytes(), os.ModePerm)
+	if err := Exec("gofmt", dir, "-w", dest); err != nil {
+		panic(err)
+	}
 }
 
 func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) (Types, error) {
@@ -679,4 +686,24 @@ func SplitInTwo(re *regexp.Regexp, s string) []string {
 	strings = append(strings, s[finalMatch[0]-1:])
 
 	return strings
+}
+
+func Exec(name string, dir string, args ...string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Dir = dir
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("command execution timeout: %s", name)
+		}
+		return fmt.Errorf("command %q failed: %w\nstderr: %s", name, err, stderr.String())
+	}
+
+	return nil
 }
