@@ -206,8 +206,16 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 
 	for explicitKey, value := range properties {
 
+		explicitRequired, err := value.GetRequiredOrFalse()
+		if err != nil {
+			return nil, err
+		}
+		if slices.Contains(requiredList, explicitKey) {
+			explicitRequired = true
+		}
+
 		if value.IsArray() {
-			res, err := ToGoArrayType([]bool{false}, explicitKey, value, parents)
+			res, err := ToGoArrayType([]bool{false}, explicitKey, value, parents, WithOmitEmpty(!explicitRequired))
 			if err != nil {
 				return nil, err
 			}
@@ -280,13 +288,6 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 			out[enumType]["$type"] = [2]string{typ}
 		}
 
-		explicitRequired, err := value.GetRequiredOrFalse()
-		if err != nil {
-			return nil, err
-		}
-		if slices.Contains(requiredList, explicitKey) {
-			explicitRequired = true
-		}
 		goType, err := GetGoType(constructedType, typeName, WithRequired(explicitRequired && !forceOptional))
 		if err != nil {
 			return nil, err
@@ -312,7 +313,7 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 	return out, nil
 }
 
-func ToGoArrayType(dim []bool, explicitKey string, value codegen.TypedParam, parents []string) (Types, error) {
+func ToGoArrayType(dim []bool, explicitKey string, value codegen.TypedParam, parents []string, opts ...GoTagOption) (Types, error) {
 	if strings.TrimSpace(explicitKey) == EmptyString {
 		return nil, fmt.Errorf("array definition requires a key")
 	}
@@ -368,7 +369,7 @@ func ToGoArrayType(dim []bool, explicitKey string, value codegen.TypedParam, par
 	}
 
 	if currentType.IsArray() {
-		res, err := ToGoArrayType(append(dim, allowNull), identKey, items[0], parents)
+		res, err := ToGoArrayType(append(dim, allowNull), identKey, items[0], parents, WithOmitEmpty(!explicitRequired))
 		if err != nil {
 			return nil, err
 		}
@@ -389,7 +390,7 @@ func ToGoArrayType(dim []bool, explicitKey string, value codegen.TypedParam, par
 		goType = fmt.Sprintf("*%s", goType)
 	}
 
-	goTags := GetTags(explicitKey, WithOmitEmpty(!explicitRequired))
+	goTags := GetTags(explicitKey, opts...)
 
 	arrayDimensions := ""
 	for _, value := range dim {

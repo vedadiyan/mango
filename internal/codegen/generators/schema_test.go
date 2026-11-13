@@ -9,16 +9,19 @@ func DefineExport() static.Schema {
 		Title:       "Test Title",
 		Description: "Test Description",
 		Properties: static.Properties{
-			"products": static.Composite{
-				Required: true,
-				Properties: static.Properties{
-					"first_name": static.Scalar{
-						Type: static.BasicTypes{static.TypeString},
+			"products": static.Array[static.Array[static.Composite]]{
+				Items: static.Array[static.Composite]{
+					Items: static.Composite{
+						Properties: static.Properties{
+							"Name": static.Scalar{
+								Required: true,
+								Type:     static.BasicTypes{static.TypeString},
+							},
+						},
 					},
-					"last_name": static.Scalar{
-						Type: static.BasicTypes{static.TypeString},
-					},
+					AllowNull: true,
 				},
+				AllowNull: true,
 			},
 		},
 	}
