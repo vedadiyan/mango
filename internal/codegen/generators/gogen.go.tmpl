@@ -29,7 +29,7 @@ import (
 	// +--------------------------------------------------+
 
 	type {{ $type }} bson.D
-
+	
 	{{- range $fieldName, $specs := $fields }}
 
 		// +--------------------------------------------------+
@@ -155,11 +155,7 @@ import (
 		{{- end }}
 
 		func (x {{ .Type }}) Get{{ .Name }}() ({{ .Field }}, error) {
-			{{- if eq $isPointer true }}
-				zero := nil
-			{{- else }}
-				var zero {{ .Field }}
-			{{- end }} 
+			var zero {{ .Field }}
 			for _, i := range x {
 				if i.Key != {{ .Name }}Name() {
 					continue

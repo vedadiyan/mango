@@ -1,14 +1,18 @@
 {
 	"Export": {
 		"Products": [
-			"[]*[]*ExportProducts",
-			"`bson:\"Products,omitempty\"`"
+			"ExportProducts",
+			"`bson:\"products\"`"
 		]
 	},
 	"ExportProducts": {
-		"Name": [
-			"string",
-			"`bson:\"Name\"`"
+		"FirstName": [
+			"*string",
+			"`bson:\"first_name,omitempty\"`"
+		],
+		"LastName": [
+			"*string",
+			"`bson:\"last_name,omitempty\"`"
 		]
 	}
 }
