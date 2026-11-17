@@ -1,12 +1,15 @@
 package hack
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type (
@@ -30,7 +33,7 @@ func (x *TestStruct) Test2() {
 }
 
 func TestAutoInliner(t *testing.T) {
-	typ := AutoInliner(reflect.TypeFor[TestStruct]())
+	typ, _ := AutoInliner(reflect.TypeFor[TestStruct]())
 	sample := TestStruct{
 		Name:     "Pouya",
 		UserName: "VPouya",
@@ -38,7 +41,7 @@ func TestAutoInliner(t *testing.T) {
 		Time:     time.Now(),
 	}
 
-	value := Convert(&sample, typ).Interface()
+	value := convert(&sample, typ).Interface()
 
 	out, err := bson.MarshalExtJSON(value, true, true)
 	if err != nil {
@@ -51,7 +54,7 @@ func TestAutoInliner(t *testing.T) {
 		t.FailNow()
 	}
 
-	back2 := Convert(back, reflect.TypeFor[TestStruct]()).Interface()
+	back2 := convert(back, reflect.TypeFor[TestStruct]()).Interface()
 
 	_ = back2
 	fmt.Println(string(out))
@@ -59,4 +62,46 @@ func TestAutoInliner(t *testing.T) {
 	if !reflect.DeepEqual(sample, value) {
 		t.FailNow()
 	}
+}
+
+type TestRegistryName struct {
+	Name string `bson:"name"`
+}
+
+type TestRegistryType struct {
+	Type string `bson:"type"`
+}
+
+func TestCodec(t *testing.T) {
+	r := bson.NewRegistry()
+	client, err := mongo.Connect(options.Client().ApplyURI("mongodb://192.168.169.190:27017").SetRegistry(r))
+	if err != nil {
+		t.FailNow()
+	}
+
+	db := client.Database("test")
+	col := db.Collection("test")
+	query, err := col.Find(context.TODO(), bson.M{})
+	if err != nil {
+		t.FailNow()
+	}
+
+	type output struct {
+		TestRegistryName
+		TestRegistryType
+		unExported bool
+	}
+
+	var val output
+
+	if err := RegisterCodec[output](r); err != nil {
+		t.FailNow()
+	}
+
+	query.Next(context.TODO())
+	if err := query.Decode(&val); err != nil {
+		t.FailNow()
+	}
+	c := 10
+	_ = c
 }

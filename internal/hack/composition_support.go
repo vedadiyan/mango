@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -20,18 +21,21 @@ type (
 )
 
 var (
+	bsonRaw      = reflect.TypeFor[bson.Raw]()
 	metadataType = reflect.TypeFor[Metadata]()
+	typeCache    = make(map[reflect.Type]reflect.Type)
+	mut          sync.Mutex
 )
 
 func RegisterCodec[T any](registry *bson.Registry) error {
 	alc := NewAutoInlinerCodec[T]()
 
-	encoder, err := registry.LookupEncoder(reflect.TypeFor[bson.Raw]())
+	encoder, err := registry.LookupEncoder(bsonRaw)
 	if err != nil {
 		return err
 	}
 
-	decoder, err := registry.LookupDecoder(reflect.TypeFor[bson.Raw]())
+	decoder, err := registry.LookupDecoder(bsonRaw)
 	if err != nil {
 		return err
 	}
@@ -68,7 +72,7 @@ func RegisterCodec[T any](registry *bson.Registry) error {
 
 func NewAutoInlinerCodec[T any]() *AutoInlinerCodec[T] {
 	srcType := reflect.TypeFor[T]()
-	dynamicType := AutoInliner(srcType)
+	dynamicType, _ := AutoInliner(srcType)
 	return &AutoInlinerCodec[T]{
 		srcType:     srcType,
 		dynamicType: dynamicType,
@@ -76,12 +80,12 @@ func NewAutoInlinerCodec[T any]() *AutoInlinerCodec[T] {
 }
 
 func (x *AutoInlinerCodec[T]) Encode(value *T) ([]byte, error) {
-	out := Convert(value, x.dynamicType)
+	out := convert(value, x.dynamicType)
 	return bson.Marshal(out.Interface())
 }
 
 func (x *AutoInlinerCodec[T]) EncodeValue(v reflect.Value) ([]byte, error) {
-	out := ConvertValue(v, x.dynamicType)
+	out := convertValue(v, x.dynamicType)
 	return bson.Marshal(out.Interface())
 }
 
@@ -90,7 +94,7 @@ func (x *AutoInlinerCodec[T]) Decode(value []byte) (*T, error) {
 	if err := bson.Unmarshal(value, v); err != nil {
 		return nil, err
 	}
-	out := Convert(v, x.srcType).Interface()
+	out := convert(v, x.srcType).Interface()
 	return out.(*T), nil
 }
 
@@ -99,26 +103,41 @@ func (x *AutoInlinerCodec[T]) DecodeValue(value []byte) (reflect.Value, error) {
 	if err := bson.Unmarshal(value, v); err != nil {
 		return reflect.Value{}, err
 	}
-	out := Convert(v, x.srcType)
+	out := convert(v, x.srcType)
 	return out, nil
 }
 
-func AutoInliner(src reflect.Type) reflect.Type {
-	indirectType, n := Indirect(src)
+func AutoInliner(src reflect.Type) (reflect.Type, bool) {
+	mut.Lock()
+	defer mut.Unlock()
+	if value, ok := typeCache[src]; ok {
+		return value, true
+	}
+	typ := autoInliner(src)
+	typeCache[src] = typ
+	return typ, false
+}
+
+func autoInliner(src reflect.Type) reflect.Type {
+	if value, ok := typeCache[src]; ok {
+		return value
+	}
+
+	indirectType, n := indirect(src)
 	var out reflect.Type
 
 	switch indirectType.Kind() {
 	case reflect.Slice:
 		{
-			out = reflect.SliceOf(AutoInliner(indirectType.Elem()))
+			out = reflect.SliceOf(autoInliner(indirectType.Elem()))
 		}
 	case reflect.Array:
 		{
-			out = reflect.ArrayOf(indirectType.Len(), AutoInliner(indirectType.Elem()))
+			out = reflect.ArrayOf(indirectType.Len(), autoInliner(indirectType.Elem()))
 		}
 	case reflect.Struct:
 		{
-			out = RewriteStruct(indirectType)
+			out = rewriteStruct(indirectType)
 		}
 	default:
 		{
@@ -127,23 +146,30 @@ func AutoInliner(src reflect.Type) reflect.Type {
 	}
 
 	if n == 0 {
+		typeCache[src] = out
 		return out
 	}
-	return PointerTo(out, n)
+	ptr := pointerTo(out, n)
+	typeCache[src] = ptr
+	return ptr
 }
 
-func RewriteStruct(src reflect.Type) reflect.Type {
+func rewriteStruct(src reflect.Type) reflect.Type {
+	if value, ok := typeCache[src]; ok {
+		return value
+	}
+
 	out := make([]reflect.StructField, 0)
 	for field := range src.Fields() {
 		typ := field.Type
 
-		if val, ok := field.Tag.Lookup("bson"); !ok || !IsOpaque(val) {
-			typ = AutoInliner(field.Type)
+		if val, ok := field.Tag.Lookup("bson"); !ok || !isOpaque(val) {
+			typ = autoInliner(field.Type)
 		}
 
 		if !field.Anonymous {
 			tag := field.Tag
-			if tagValue, ok := IsMetadata(field.Type); ok {
+			if tagValue, ok := isMetadata(field.Type); ok {
 				tag = tagValue
 			}
 			out = append(out, reflect.StructField{
@@ -180,10 +206,12 @@ func RewriteStruct(src reflect.Type) reflect.Type {
 		})
 
 	}
-	return reflect.StructOf(out)
+	typ := reflect.StructOf(out)
+	typeCache[src] = typ
+	return typ
 }
 
-func Indirect(src reflect.Type) (reflect.Type, int) {
+func indirect(src reflect.Type) (reflect.Type, int) {
 	current := src
 	n := 0
 	if src.Kind() == reflect.Pointer {
@@ -195,7 +223,7 @@ func Indirect(src reflect.Type) (reflect.Type, int) {
 	return current, n
 }
 
-func PointerTo(src reflect.Type, n int) reflect.Type {
+func pointerTo(src reflect.Type, n int) reflect.Type {
 	typ := src
 	for range n {
 		typ = reflect.PointerTo(typ)
@@ -203,15 +231,15 @@ func PointerTo(src reflect.Type, n int) reflect.Type {
 	return typ
 }
 
-func IsMetadata(src reflect.Type) (reflect.StructTag, bool) {
+func isMetadata(src reflect.Type) (reflect.StructTag, bool) {
 	switch src.Kind() {
 	case reflect.Pointer:
 		{
-			return IsMetadata(src.Elem())
+			return isMetadata(src.Elem())
 		}
 	case reflect.Slice, reflect.Array:
 		{
-			return IsMetadata(src.Elem())
+			return isMetadata(src.Elem())
 		}
 	case reflect.Struct:
 		{
@@ -234,14 +262,14 @@ func IsMetadata(src reflect.Type) (reflect.StructTag, bool) {
 	}
 }
 
-func IsOpaque(str string) bool {
+func isOpaque(str string) bool {
 	return slices.Contains(strings.Split(str, ","), "opaque")
 }
 
-func Convert(v any, typ reflect.Type) reflect.Value {
+func convert(v any, typ reflect.Type) reflect.Value {
 	return reflect.NewAt(typ, reflect.ValueOf(v).UnsafePointer())
 }
 
-func ConvertValue(v reflect.Value, typ reflect.Type) reflect.Value {
+func convertValue(v reflect.Value, typ reflect.Type) reflect.Value {
 	return reflect.NewAt(typ, v.UnsafePointer())
 }
