@@ -89,7 +89,7 @@ func TestCodec(t *testing.T) {
 	type output struct {
 		TestRegistryName
 		TestRegistryType
-		unExported bool
+		Recursive *output
 	}
 
 	var val output

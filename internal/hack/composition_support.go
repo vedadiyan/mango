@@ -1,6 +1,7 @@
 package hack
 
 import (
+	"fmt"
 	"reflect"
 	"slices"
 	"strings"
@@ -18,6 +19,8 @@ type (
 	Metadata interface {
 		dummyMethod(Metadata)
 	}
+
+	CycleLoopDetector map[reflect.Type]bool
 )
 
 var (
@@ -27,8 +30,24 @@ var (
 	mut          sync.Mutex
 )
 
+func (cld CycleLoopDetector) Track(typ reflect.Type) {
+	cld[typ] = true
+}
+
+func (cld CycleLoopDetector) Has(typ reflect.Type) bool {
+	_, ok := cld[typ]
+	return ok
+}
+
+func (cld CycleLoopDetector) Release(typ reflect.Type) {
+	delete(cld, typ)
+}
+
 func RegisterCodec[T any](registry *bson.Registry) error {
-	alc := NewAutoInlinerCodec[T]()
+	alc, err := NewAutoInlinerCodec[T]()
+	if err != nil {
+		return err
+	}
 
 	encoder, err := registry.LookupEncoder(bsonRaw)
 	if err != nil {
@@ -70,13 +89,16 @@ func RegisterCodec[T any](registry *bson.Registry) error {
 	return nil
 }
 
-func NewAutoInlinerCodec[T any]() *AutoInlinerCodec[T] {
+func NewAutoInlinerCodec[T any]() (*AutoInlinerCodec[T], error) {
 	srcType := reflect.TypeFor[T]()
-	dynamicType, _ := AutoInliner(srcType)
+	dynamicType, err := AutoInliner(srcType)
+	if err != nil {
+		return nil, err
+	}
 	return &AutoInlinerCodec[T]{
 		srcType:     srcType,
 		dynamicType: dynamicType,
-	}
+	}, nil
 }
 
 func (x *AutoInlinerCodec[T]) Encode(value *T) ([]byte, error) {
@@ -107,20 +129,23 @@ func (x *AutoInlinerCodec[T]) DecodeValue(value []byte) (reflect.Value, error) {
 	return out, nil
 }
 
-func AutoInliner(src reflect.Type) (reflect.Type, bool) {
+func AutoInliner(src reflect.Type) (reflect.Type, error) {
 	mut.Lock()
 	defer mut.Unlock()
 	if value, ok := typeCache[src]; ok {
-		return value, true
+		return value, nil
 	}
-	typ := autoInliner(src)
+	typ, err := autoInliner(src, make(CycleLoopDetector))
+	if err != nil {
+		return nil, err
+	}
 	typeCache[src] = typ
-	return typ, false
+	return typ, nil
 }
 
-func autoInliner(src reflect.Type) reflect.Type {
+func autoInliner(src reflect.Type, cld CycleLoopDetector) (reflect.Type, error) {
 	if value, ok := typeCache[src]; ok {
-		return value
+		return value, nil
 	}
 
 	indirectType, n := indirect(src)
@@ -129,15 +154,27 @@ func autoInliner(src reflect.Type) reflect.Type {
 	switch indirectType.Kind() {
 	case reflect.Slice:
 		{
-			out = reflect.SliceOf(autoInliner(indirectType.Elem()))
+			res, err := autoInliner(indirectType.Elem(), cld)
+			if err != nil {
+				return nil, err
+			}
+			out = reflect.SliceOf(res)
 		}
 	case reflect.Array:
 		{
-			out = reflect.ArrayOf(indirectType.Len(), autoInliner(indirectType.Elem()))
+			res, err := autoInliner(indirectType.Elem(), cld)
+			if err != nil {
+				return nil, err
+			}
+			out = reflect.ArrayOf(indirectType.Len(), res)
 		}
 	case reflect.Struct:
 		{
-			out = rewriteStruct(indirectType)
+			res, err := rewriteStruct(indirectType, cld)
+			if err != nil {
+				return nil, err
+			}
+			out = res
 		}
 	default:
 		{
@@ -147,24 +184,37 @@ func autoInliner(src reflect.Type) reflect.Type {
 
 	if n == 0 {
 		typeCache[src] = out
-		return out
+		return out, nil
 	}
 	ptr := pointerTo(out, n)
 	typeCache[src] = ptr
-	return ptr
+	return ptr, nil
 }
 
-func rewriteStruct(src reflect.Type) reflect.Type {
+func rewriteStruct(src reflect.Type, cld CycleLoopDetector) (reflect.Type, error) {
 	if value, ok := typeCache[src]; ok {
-		return value
+		return value, nil
 	}
 
+	var finalResult reflect.Type
 	out := make([]reflect.StructField, 0)
+	cld.Track(src)
+	defer cld.Release(src)
+
 	for field := range src.Fields() {
 		typ := field.Type
 
+		ityp, _ := indirect(typ)
+		if ok := cld.Has(ityp); ok {
+			return nil, fmt.Errorf("cycle loop detected")
+		}
+
 		if val, ok := field.Tag.Lookup("bson"); !ok || !isOpaque(val) {
-			typ = autoInliner(field.Type)
+			res, err := autoInliner(field.Type, cld)
+			if err != nil {
+				return nil, err
+			}
+			typ = res
 		}
 
 		if !field.Anonymous {
@@ -206,9 +256,9 @@ func rewriteStruct(src reflect.Type) reflect.Type {
 		})
 
 	}
-	typ := reflect.StructOf(out)
-	typeCache[src] = typ
-	return typ
+	finalResult = reflect.StructOf(out)
+	typeCache[src] = finalResult
+	return finalResult, nil
 }
 
 func indirect(src reflect.Type) (reflect.Type, int) {
