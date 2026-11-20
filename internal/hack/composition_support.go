@@ -23,54 +23,21 @@ type (
 	CycleLoopDetector map[reflect.Type]bool
 )
 
-// Mirror of Go's internal/abi.Type header (Go 1.21+)
-type abiType struct {
-	Size_       uintptr
-	PtrBytes    uintptr
-	Hash        uint32
-	TFlag       uint8
-	Align_      uint8
-	FieldAlign_ uint8
-	Kind_       uint8
-	Equal       func(unsafe.Pointer, unsafe.Pointer) bool
-	GCData      *byte
-	Str         int32
-	PtrToThis   int32
-}
-
-type abiName struct {
-	Bytes *byte
-}
-
-type abiStructField struct {
-	Name   abiName
-	Typ    *abiType
-	Offset uintptr
-}
-
-// Mirror of Go's internal/abi.StructType
-type structType struct {
-	abiType
-	PkgPath abiName
-	Fields  []abiStructField
-}
-
-// ifaceHeader extracts the data pointer from a reflect.Type interface
-type ifaceHeader struct {
-	tab  unsafe.Pointer
-	data unsafe.Pointer
-}
-
-func unpackType(t reflect.Type) *abiType {
-	return (*abiType)((*ifaceHeader)(unsafe.Pointer(&t)).data)
-}
-
 var (
 	bsonRaw      = reflect.TypeFor[bson.Raw]()
 	metadataType = reflect.TypeFor[Metadata]()
 	typeCache    = make(map[reflect.Type]reflect.Type)
 	mut          sync.Mutex
 )
+
+//go:linkname typelinks reflect.typelinks
+func typelinks() (sections []unsafe.Pointer, offset [][]int32)
+
+//go:linkname resolveTypeOff reflect.resolveTypeOff
+func resolveTypeOff(rtype unsafe.Pointer, off int32) unsafe.Pointer
+
+//go:linkname toType reflect.toType
+func toType(t unsafe.Pointer) reflect.Type
 
 func (cld CycleLoopDetector) Track(typ reflect.Type) {
 	cld[typ] = true
@@ -233,6 +200,35 @@ func autoInliner(src reflect.Type, cld CycleLoopDetector) (reflect.Type, error) 
 	return ptr, nil
 }
 
+func getRuntimeAbiStructType() reflect.Type {
+	sections, offsets := typelinks()
+	for i, base := range sections {
+		for _, off := range offsets[i] {
+			// Let reflect's own toType construct the reflect.Type interface
+			t := toType(unsafe.Add(base, uintptr(off)))
+
+			if t.String() == "abi.StructType" {
+				return t
+			}
+			if t.Kind() == reflect.Pointer && t.Elem().String() == "abi.StructType" {
+				return t.Elem()
+			}
+		}
+	}
+	panic("abi.StructType not found in runtime typelinks")
+}
+
+func patchFieldType(src reflect.Type, index int, target reflect.Type) {
+	realAbiStructType := getRuntimeAbiStructType()
+
+	// reflect.ValueOf(src).UnsafePointer() unboxes the interface via standard reflect
+	rawStruct := reflect.NewAt(realAbiStructType, reflect.ValueOf(src).UnsafePointer()).Elem()
+	typField := rawStruct.FieldByName("Fields").Index(index).FieldByName("Typ")
+
+	// Write target's underlying pointer via reflect.ValueOf(target).UnsafePointer()
+	*(*unsafe.Pointer)(typField.Addr().UnsafePointer()) = reflect.ValueOf(target).UnsafePointer()
+}
+
 func rewriteStruct(src reflect.Type, cld CycleLoopDetector) (reflect.Type, error) {
 	if value, ok := typeCache[src]; ok {
 		return value, nil
@@ -255,9 +251,7 @@ func rewriteStruct(src reflect.Type, cld CycleLoopDetector) (reflect.Type, error
 			placeholderPtr := reflect.PointerTo(reflect.TypeFor[struct{}]())
 			i := idx - 1
 			finalFields = append(finalFields, func() {
-				ptrToXType := reflect.PointerTo(finalResult)
-				rawStruct := (*structType)(unsafe.Pointer(unpackType(finalResult)))
-				rawStruct.Fields[i].Typ = unpackType(ptrToXType)
+				patchFieldType(finalResult, i, reflect.PointerTo(finalResult))
 			})
 
 			out = append(out, reflect.StructField{
