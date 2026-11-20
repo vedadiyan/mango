@@ -249,7 +249,7 @@ func rewriteStruct(src reflect.Type, cld CycleLoopDetector) (reflect.Type, error
 				Offset:    field.Offset,
 				PkgPath:   field.PkgPath,
 				Type:      emptyType,
-				Tag:       "",
+				Tag:       field.Tag,
 			})
 			continue
 		}
