@@ -214,16 +214,6 @@ func autoInliner(src reflect.Type, cld CycleLoopDetector) (reflect.Type, error) 
 	return ptr, nil
 }
 
-func patchFieldType(src reflect.Type, index int, target reflect.Type) {
-
-	// reflect.ValueOf(src).UnsafePointer() unboxes the interface via standard reflect
-	rawStruct := reflect.NewAt(abi, reflect.ValueOf(src).UnsafePointer()).Elem()
-	typField := rawStruct.FieldByName("Fields").Index(index).FieldByName("Typ")
-
-	// Write target's underlying pointer via reflect.ValueOf(target).UnsafePointer()
-	*(*unsafe.Pointer)(typField.Addr().UnsafePointer()) = reflect.ValueOf(target).UnsafePointer()
-}
-
 func rewriteStruct(src reflect.Type, cld CycleLoopDetector) (reflect.Type, error) {
 	if value, ok := typeCache[src]; ok {
 		return value, nil
@@ -246,7 +236,9 @@ func rewriteStruct(src reflect.Type, cld CycleLoopDetector) (reflect.Type, error
 			placeholderPtr := reflect.PointerTo(reflect.TypeFor[struct{}]())
 			i := idx - 1
 			finalFields = append(finalFields, func() {
-				patchFieldType(finalResult, i, reflect.PointerTo(finalResult))
+				rawStruct := reflect.NewAt(abi, reflect.ValueOf(finalResult).UnsafePointer()).Elem()
+				typField := rawStruct.FieldByName("Fields").Index(i).FieldByName("Typ")
+				*(*unsafe.Pointer)(typField.Addr().UnsafePointer()) = reflect.ValueOf(finalResult).UnsafePointer()
 			})
 
 			out = append(out, reflect.StructField{
