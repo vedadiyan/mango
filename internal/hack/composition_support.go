@@ -27,6 +27,7 @@ var (
 	bsonRaw      = reflect.TypeFor[bson.Raw]()
 	metadataType = reflect.TypeFor[Metadata]()
 	typeCache    = make(map[reflect.Type]reflect.Type)
+	emptyType    = reflect.PointerTo(reflect.TypeFor[struct{}]())
 	abi          reflect.Type
 	mut          sync.Mutex
 )
@@ -233,7 +234,6 @@ func rewriteStruct(src reflect.Type, cld CycleLoopDetector) (reflect.Type, error
 
 		ityp, _ := indirect(typ)
 		if ok := cld.Has(ityp); ok {
-			placeholderPtr := reflect.PointerTo(reflect.TypeFor[struct{}]())
 			i := idx - 1
 			finalFields = append(finalFields, func() {
 				typ := reflect.NewAt(abi, reflect.ValueOf(finalResult).UnsafePointer()).Elem()
@@ -248,7 +248,7 @@ func rewriteStruct(src reflect.Type, cld CycleLoopDetector) (reflect.Type, error
 				Index:     field.Index,
 				Offset:    field.Offset,
 				PkgPath:   field.PkgPath,
-				Type:      placeholderPtr,
+				Type:      emptyType,
 				Tag:       "",
 			})
 			continue
