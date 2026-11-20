@@ -222,10 +222,10 @@ func rewriteStruct(src reflect.Type, cld CycleLoopDetector) (reflect.Type, error
 
 	var finalResult reflect.Type
 	out := make([]reflect.StructField, 0)
+	cycleLoops := make([]func(), 0)
 	cld.Track(src)
 	defer cld.Release(src)
 
-	cycleLoops := make([]func(), 0)
 	for i := range src.NumField() {
 		field := src.Field(i)
 		typ := field.Type
