@@ -1,11 +1,11 @@
 package hack
 
 import (
-	"fmt"
 	"reflect"
 	"slices"
 	"strings"
 	"sync"
+	"unsafe"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -22,6 +22,48 @@ type (
 
 	CycleLoopDetector map[reflect.Type]bool
 )
+
+// Mirror of Go's internal/abi.Type header (Go 1.21+)
+type abiType struct {
+	Size_       uintptr
+	PtrBytes    uintptr
+	Hash        uint32
+	TFlag       uint8
+	Align_      uint8
+	FieldAlign_ uint8
+	Kind_       uint8
+	Equal       func(unsafe.Pointer, unsafe.Pointer) bool
+	GCData      *byte
+	Str         int32
+	PtrToThis   int32
+}
+
+type abiName struct {
+	Bytes *byte
+}
+
+type abiStructField struct {
+	Name   abiName
+	Typ    *abiType
+	Offset uintptr
+}
+
+// Mirror of Go's internal/abi.StructType
+type structType struct {
+	abiType
+	PkgPath abiName
+	Fields  []abiStructField
+}
+
+// ifaceHeader extracts the data pointer from a reflect.Type interface
+type ifaceHeader struct {
+	tab  unsafe.Pointer
+	data unsafe.Pointer
+}
+
+func unpackType(t reflect.Type) *abiType {
+	return (*abiType)((*ifaceHeader)(unsafe.Pointer(&t)).data)
+}
 
 var (
 	bsonRaw      = reflect.TypeFor[bson.Raw]()
@@ -201,12 +243,33 @@ func rewriteStruct(src reflect.Type, cld CycleLoopDetector) (reflect.Type, error
 	cld.Track(src)
 	defer cld.Release(src)
 
+	finalFields := make([]func(), 0)
+
+	idx := 0
 	for field := range src.Fields() {
+		idx++
 		typ := field.Type
 
 		ityp, _ := indirect(typ)
 		if ok := cld.Has(ityp); ok {
-			return nil, fmt.Errorf("cycle loop detected")
+			placeholderPtr := reflect.PointerTo(reflect.TypeFor[struct{}]())
+			i := idx - 1
+			finalFields = append(finalFields, func() {
+				ptrToXType := reflect.PointerTo(finalResult)
+				rawStruct := (*structType)(unsafe.Pointer(unpackType(finalResult)))
+				rawStruct.Fields[i].Typ = unpackType(ptrToXType)
+			})
+
+			out = append(out, reflect.StructField{
+				Name:      field.Name,
+				Anonymous: false,
+				Index:     field.Index,
+				Offset:    field.Offset,
+				PkgPath:   field.PkgPath,
+				Type:      placeholderPtr,
+				Tag:       "",
+			})
+			continue
 		}
 
 		if val, ok := field.Tag.Lookup("bson"); !ok || !isOpaque(val) {
@@ -258,6 +321,9 @@ func rewriteStruct(src reflect.Type, cld CycleLoopDetector) (reflect.Type, error
 	}
 	finalResult = reflect.StructOf(out)
 	typeCache[src] = finalResult
+	for _, fn := range finalFields {
+		fn()
+	}
 	return finalResult, nil
 }
 
