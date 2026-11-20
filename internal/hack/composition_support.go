@@ -236,10 +236,10 @@ func rewriteStruct(src reflect.Type, cld CycleLoopDetector) (reflect.Type, error
 			placeholderPtr := reflect.PointerTo(reflect.TypeFor[struct{}]())
 			i := idx - 1
 			finalFields = append(finalFields, func() {
-				rawStruct := reflect.NewAt(abi, reflect.ValueOf(finalResult).UnsafePointer()).Elem()
-				typField := rawStruct.FieldByName("Fields").Index(i).FieldByName("Typ")
-				mutField := (*unsafe.Pointer)(typField.Addr().UnsafePointer())
-				*mutField = reflect.ValueOf(reflect.PointerTo(finalResult)).UnsafePointer()
+				innerType := reflect.NewAt(abi, reflect.ValueOf(finalResult).UnsafePointer()).Elem()
+				field := innerType.FieldByName("Fields").Index(i).FieldByName("Typ")
+				fieldAddr := (*unsafe.Pointer)(field.Addr().UnsafePointer())
+				*fieldAddr = reflect.ValueOf(reflect.PointerTo(finalResult)).UnsafePointer()
 			})
 
 			out = append(out, reflect.StructField{
