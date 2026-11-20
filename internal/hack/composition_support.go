@@ -27,6 +27,7 @@ var (
 	bsonRaw      = reflect.TypeFor[bson.Raw]()
 	metadataType = reflect.TypeFor[Metadata]()
 	typeCache    = make(map[reflect.Type]reflect.Type)
+	abi          reflect.Type
 	mut          sync.Mutex
 )
 
@@ -38,6 +39,26 @@ func resolveTypeOff(rtype unsafe.Pointer, off int32) unsafe.Pointer
 
 //go:linkname toType reflect.toType
 func toType(t unsafe.Pointer) reflect.Type
+
+func init() {
+	sections, offsets := typelinks()
+	for i, base := range sections {
+		for _, off := range offsets[i] {
+			// Let reflect's own toType construct the reflect.Type interface
+			t := toType(unsafe.Add(base, uintptr(off)))
+
+			if t.String() == "abi.StructType" {
+				abi = t
+				return
+			}
+			if t.Kind() == reflect.Pointer && t.Elem().String() == "abi.StructType" {
+				abi = t.Elem()
+				return
+			}
+		}
+	}
+	panic("abi.StructType not found in runtime typelinks")
+}
 
 func (cld CycleLoopDetector) Track(typ reflect.Type) {
 	cld[typ] = true
@@ -200,29 +221,10 @@ func autoInliner(src reflect.Type, cld CycleLoopDetector) (reflect.Type, error) 
 	return ptr, nil
 }
 
-func getRuntimeAbiStructType() reflect.Type {
-	sections, offsets := typelinks()
-	for i, base := range sections {
-		for _, off := range offsets[i] {
-			// Let reflect's own toType construct the reflect.Type interface
-			t := toType(unsafe.Add(base, uintptr(off)))
-
-			if t.String() == "abi.StructType" {
-				return t
-			}
-			if t.Kind() == reflect.Pointer && t.Elem().String() == "abi.StructType" {
-				return t.Elem()
-			}
-		}
-	}
-	panic("abi.StructType not found in runtime typelinks")
-}
-
 func patchFieldType(src reflect.Type, index int, target reflect.Type) {
-	realAbiStructType := getRuntimeAbiStructType()
 
 	// reflect.ValueOf(src).UnsafePointer() unboxes the interface via standard reflect
-	rawStruct := reflect.NewAt(realAbiStructType, reflect.ValueOf(src).UnsafePointer()).Elem()
+	rawStruct := reflect.NewAt(abi, reflect.ValueOf(src).UnsafePointer()).Elem()
 	typField := rawStruct.FieldByName("Fields").Index(index).FieldByName("Typ")
 
 	// Write target's underlying pointer via reflect.ValueOf(target).UnsafePointer()
