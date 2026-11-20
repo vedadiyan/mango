@@ -45,9 +45,9 @@ func init() {
 	for i, base := range sections {
 		for _, off := range offsets[i] {
 			// Let reflect's own toType construct the reflect.Type interface
-			t := toType(unsafe.Add(base, uintptr(off)))
+			t := toType(unsafe.Add(base, uintptr(off))).Elem()
 
-			if t.Elem().String() == "abi.StructType" {
+			if t.String() == "abi.StructType" {
 				abi = t.Elem()
 				return
 			}
