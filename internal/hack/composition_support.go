@@ -47,10 +47,6 @@ func init() {
 			// Let reflect's own toType construct the reflect.Type interface
 			t := toType(unsafe.Add(base, uintptr(off)))
 
-			if t.String() == "abi.StructType" {
-				abi = t
-				return
-			}
 			if t.Kind() == reflect.Pointer && t.Elem().String() == "abi.StructType" {
 				abi = t.Elem()
 				return
