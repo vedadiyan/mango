@@ -48,7 +48,7 @@ func init() {
 			t := toType(unsafe.Add(base, uintptr(off))).Elem()
 
 			if t.String() == "abi.StructType" {
-				abi = t.Elem()
+				abi = t
 				return
 			}
 		}
