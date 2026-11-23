@@ -33,7 +33,7 @@ func (x *TestStruct) Test2() {
 }
 
 func TestAutoInliner(t *testing.T) {
-	typ, _ := AutoInliner(reflect.TypeFor[TestStruct]())
+	typ, _ := Rewrite(reflect.TypeFor[TestStruct]())
 	sample := TestStruct{
 		Name:     "Pouya",
 		UserName: "VPouya",
