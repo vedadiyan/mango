@@ -246,28 +246,7 @@ func rewriteStruct(src reflect.Type, cld CycleLoopDetector) (reflect.Type, Cycle
 		ityp := concreteType(typ)
 		if val, ok := cld.Has(ityp); ok {
 			clh = append(clh, func() {
-				bl := bluePrint(typ)
-				typ := reflect.NewAt(abi, reflect.ValueOf(finalResult).UnsafePointer()).Elem()
-				f := typ.FieldByName("Fields").Index(i).FieldByName("Typ")
-				addr := (*unsafe.Pointer)(f.Addr().UnsafePointer())
-				ptr := *val
-				for _, i := range bl {
-					switch i.Kind() {
-					case reflect.Pointer:
-						{
-							ptr = reflect.PointerTo(ptr)
-						}
-					case reflect.Slice:
-						{
-							ptr = reflect.SliceOf(ptr)
-						}
-					case reflect.Array:
-						{
-							ptr = reflect.ArrayOf(i.Len(), ptr)
-						}
-					}
-				}
-				*addr = reflect.ValueOf(ptr).UnsafePointer()
+				patch(&finalResult, i, typ, val)
 			})
 
 			out = append(out, reflect.StructField{
@@ -333,6 +312,31 @@ func rewriteStruct(src reflect.Type, cld CycleLoopDetector) (reflect.Type, Cycle
 	finalResult = reflect.StructOf(out)
 	typeCache[src] = finalResult
 	return finalResult, clh, nil
+}
+
+func patch(structType *reflect.Type, fieldIndex int, fieldType reflect.Type, concreteType *reflect.Type) {
+	bl := bluePrint(fieldType)
+	typ := reflect.NewAt(abi, reflect.ValueOf(*structType).UnsafePointer()).Elem()
+	f := typ.FieldByName("Fields").Index(fieldIndex).FieldByName("Typ")
+	addr := (*unsafe.Pointer)(f.Addr().UnsafePointer())
+	ptr := *concreteType
+	for _, i := range bl {
+		switch i.Kind() {
+		case reflect.Pointer:
+			{
+				ptr = reflect.PointerTo(ptr)
+			}
+		case reflect.Slice:
+			{
+				ptr = reflect.SliceOf(ptr)
+			}
+		case reflect.Array:
+			{
+				ptr = reflect.ArrayOf(i.Len(), ptr)
+			}
+		}
+	}
+	*addr = reflect.ValueOf(ptr).UnsafePointer()
 }
 
 func indirect(src reflect.Type) (reflect.Type, int) {

@@ -90,7 +90,7 @@ func TestCodec(t *testing.T) {
 		TestRegistryName
 		TestRegistryType
 		Recursive struct {
-			Recursive []output
+			Recursive *output
 		}
 	}
 
