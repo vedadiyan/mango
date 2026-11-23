@@ -20,7 +20,8 @@ type (
 		dummyMethod(Metadata)
 	}
 
-	CycleLoopDetector map[reflect.Type]bool
+	CycleLoopDetector map[reflect.Type]*reflect.Type
+	CycleLoopHandlers []func()
 )
 
 var (
@@ -54,13 +55,19 @@ func init() {
 	panic("abi.StructType not found in runtime typelinks")
 }
 
-func (cld CycleLoopDetector) Track(typ reflect.Type) {
-	cld[typ] = true
+func (clh CycleLoopHandlers) inject() {
+	for _, fn := range clh {
+		fn()
+	}
 }
 
-func (cld CycleLoopDetector) Has(typ reflect.Type) bool {
-	_, ok := cld[typ]
-	return ok
+func (cld CycleLoopDetector) Track(typ reflect.Type, finalType *reflect.Type) {
+	cld[typ] = finalType
+}
+
+func (cld CycleLoopDetector) Has(typ reflect.Type) (*reflect.Type, bool) {
+	out, ok := cld[typ]
+	return out, ok
 }
 
 func (cld CycleLoopDetector) Release(typ reflect.Type) {
@@ -159,18 +166,21 @@ func AutoInliner(src reflect.Type) (reflect.Type, error) {
 	if value, ok := typeCache[src]; ok {
 		return value, nil
 	}
-	typ, err := autoInliner(src, make(CycleLoopDetector))
+	typ, clh, err := autoInliner(src, make(CycleLoopDetector))
 	if err != nil {
 		return nil, err
 	}
+	clh.inject()
 	typeCache[src] = typ
 	return typ, nil
 }
 
-func autoInliner(src reflect.Type, cld CycleLoopDetector) (reflect.Type, error) {
+func autoInliner(src reflect.Type, cld CycleLoopDetector) (reflect.Type, CycleLoopHandlers, error) {
 	if value, ok := typeCache[src]; ok {
-		return value, nil
+		return value, nil, nil
 	}
+
+	var clhContainer CycleLoopHandlers
 
 	indirectType, n := indirect(src)
 	var out reflect.Type
@@ -178,27 +188,30 @@ func autoInliner(src reflect.Type, cld CycleLoopDetector) (reflect.Type, error) 
 	switch indirectType.Kind() {
 	case reflect.Slice:
 		{
-			res, err := autoInliner(indirectType.Elem(), cld)
+			res, clh, err := autoInliner(indirectType.Elem(), cld)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			out = reflect.SliceOf(res)
+			clhContainer = append(clhContainer, clh...)
 		}
 	case reflect.Array:
 		{
-			res, err := autoInliner(indirectType.Elem(), cld)
+			res, clh, err := autoInliner(indirectType.Elem(), cld)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			out = reflect.ArrayOf(indirectType.Len(), res)
+			clhContainer = append(clhContainer, clh...)
 		}
 	case reflect.Struct:
 		{
-			res, err := rewriteStruct(indirectType, cld)
+			res, clh, err := rewriteStruct(indirectType, cld)
 			if err != nil {
-				return nil, err
+				return nil, clh, err
 			}
 			out = res
+			clhContainer = append(clhContainer, clh...)
 		}
 	default:
 		{
@@ -208,22 +221,22 @@ func autoInliner(src reflect.Type, cld CycleLoopDetector) (reflect.Type, error) 
 
 	if n == 0 {
 		typeCache[src] = out
-		return out, nil
+		return out, clhContainer, nil
 	}
 	ptr := pointerTo(out, n)
 	typeCache[src] = ptr
-	return ptr, nil
+	return ptr, clhContainer, nil
 }
 
-func rewriteStruct(src reflect.Type, cld CycleLoopDetector) (reflect.Type, error) {
+func rewriteStruct(src reflect.Type, cld CycleLoopDetector) (reflect.Type, CycleLoopHandlers, error) {
 	if value, ok := typeCache[src]; ok {
-		return value, nil
+		return value, nil, nil
 	}
 
 	var finalResult reflect.Type
+	var clh CycleLoopHandlers
 	out := make([]reflect.StructField, 0)
-	cycleLoops := make([]func(), 0)
-	cld.Track(src)
+	cld.Track(src, &finalResult)
 	defer cld.Release(src)
 
 	for i := range src.NumField() {
@@ -231,12 +244,12 @@ func rewriteStruct(src reflect.Type, cld CycleLoopDetector) (reflect.Type, error
 		typ := field.Type
 
 		ityp, _ := indirect(typ)
-		if ok := cld.Has(ityp); ok {
-			cycleLoops = append(cycleLoops, func() {
+		if val, ok := cld.Has(ityp); ok {
+			clh = append(clh, func() {
 				typ := reflect.NewAt(abi, reflect.ValueOf(finalResult).UnsafePointer()).Elem()
 				f := typ.FieldByName("Fields").Index(i).FieldByName("Typ")
 				addr := (*unsafe.Pointer)(f.Addr().UnsafePointer())
-				*addr = reflect.ValueOf(reflect.PointerTo(finalResult)).UnsafePointer()
+				*addr = reflect.ValueOf(reflect.PointerTo(*val)).UnsafePointer()
 			})
 
 			out = append(out, reflect.StructField{
@@ -252,11 +265,12 @@ func rewriteStruct(src reflect.Type, cld CycleLoopDetector) (reflect.Type, error
 		}
 
 		if val, ok := field.Tag.Lookup("bson"); !ok || !isOpaque(val) {
-			res, err := autoInliner(field.Type, cld)
+			res, fn, err := autoInliner(field.Type, cld)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			typ = res
+			clh = append(clh, fn...)
 		}
 
 		if !field.Anonymous {
@@ -300,10 +314,7 @@ func rewriteStruct(src reflect.Type, cld CycleLoopDetector) (reflect.Type, error
 	}
 	finalResult = reflect.StructOf(out)
 	typeCache[src] = finalResult
-	for _, fn := range cycleLoops {
-		fn()
-	}
-	return finalResult, nil
+	return finalResult, clh, nil
 }
 
 func indirect(src reflect.Type) (reflect.Type, int) {
