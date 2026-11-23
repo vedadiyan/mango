@@ -26,7 +26,7 @@ func Rewrite(src reflect.Type) (reflect.Type, error) {
 	if value, ok := typeCache[src]; ok {
 		return value, nil
 	}
-	typ, crh, err := typeRewrite(src, make(CircularReferenceDetector))
+	typ, crh, err := typeRewrite(src, make(circularReferenceDetector))
 	if err != nil {
 		return nil, err
 	}
@@ -37,12 +37,12 @@ func Rewrite(src reflect.Type) (reflect.Type, error) {
 	return typ, nil
 }
 
-func typeRewrite(src reflect.Type, cld CircularReferenceDetector) (reflect.Type, CircularReferenceHandlers, error) {
+func typeRewrite(src reflect.Type, cld circularReferenceDetector) (reflect.Type, circularReferenceHandlers, error) {
 	if value, ok := typeCache[src]; ok {
 		return value, nil, nil
 	}
 
-	var localCrh CircularReferenceHandlers
+	var localCrh circularReferenceHandlers
 
 	indirectType, n := indirect(src)
 	var out reflect.Type
@@ -90,23 +90,23 @@ func typeRewrite(src reflect.Type, cld CircularReferenceDetector) (reflect.Type,
 	return ptr, localCrh, nil
 }
 
-func structRewrite(src reflect.Type, cld CircularReferenceDetector) (reflect.Type, CircularReferenceHandlers, error) {
+func structRewrite(src reflect.Type, cld circularReferenceDetector) (reflect.Type, circularReferenceHandlers, error) {
 	if value, ok := typeCache[src]; ok {
 		return value, nil, nil
 	}
 
 	var finalResult reflect.Type
-	var crh CircularReferenceHandlers
+	var crh circularReferenceHandlers
 	out := make([]reflect.StructField, 0)
-	cld.Track(src, &finalResult)
-	defer cld.Release(src)
+	cld.track(src, &finalResult)
+	defer cld.release(src)
 
 	for i := range src.NumField() {
 		field := src.Field(i)
 		typ := field.Type
 
 		ityp := concreteType(typ)
-		if val, ok := cld.Has(ityp); ok {
+		if val, ok := cld.has(ityp); ok {
 			crh = append(crh, func() error {
 				return abiPatch(&finalResult, i, typ, val)
 			})

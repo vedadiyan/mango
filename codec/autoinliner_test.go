@@ -1,4 +1,4 @@
-package hack
+package codec
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vedadiyan/mango/internal/hack"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -33,7 +34,7 @@ func (x *TestStruct) Test2() {
 }
 
 func TestAutoInliner(t *testing.T) {
-	typ, _ := Rewrite(reflect.TypeFor[TestStruct]())
+	typ, _ := hack.Rewrite(reflect.TypeFor[TestStruct]())
 	sample := TestStruct{
 		Name:     "Pouya",
 		UserName: "VPouya",

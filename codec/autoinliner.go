@@ -1,8 +1,9 @@
-package hack
+package codec
 
 import (
 	"reflect"
 
+	"github.com/vedadiyan/mango/internal/hack"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
@@ -65,7 +66,7 @@ func RegisterCodec[T any](registry *bson.Registry) error {
 
 func NewAutoInlinerCodec[T any]() (*AutoInlinerCodec[T], error) {
 	srcType := reflect.TypeFor[T]()
-	dynamicType, err := Rewrite(srcType)
+	dynamicType, err := hack.Rewrite(srcType)
 	if err != nil {
 		return nil, err
 	}
