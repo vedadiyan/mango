@@ -243,15 +243,29 @@ func rewriteStruct(src reflect.Type, cld CycleLoopDetector) (reflect.Type, Cycle
 		field := src.Field(i)
 		typ := field.Type
 
-		ityp, n := indirect(typ)
+		ityp := concreteType(typ)
 		if val, ok := cld.Has(ityp); ok {
 			clh = append(clh, func() {
+				bl := bluePrint(typ)
 				typ := reflect.NewAt(abi, reflect.ValueOf(finalResult).UnsafePointer()).Elem()
 				f := typ.FieldByName("Fields").Index(i).FieldByName("Typ")
 				addr := (*unsafe.Pointer)(f.Addr().UnsafePointer())
 				ptr := *val
-				for range n {
-					ptr = reflect.PointerTo(ptr)
+				for _, i := range bl {
+					switch i.Kind() {
+					case reflect.Pointer:
+						{
+							ptr = reflect.PointerTo(ptr)
+						}
+					case reflect.Slice:
+						{
+							ptr = reflect.SliceOf(ptr)
+						}
+					case reflect.Array:
+						{
+							ptr = reflect.ArrayOf(i.Len(), ptr)
+						}
+					}
 				}
 				*addr = reflect.ValueOf(ptr).UnsafePointer()
 			})
@@ -382,4 +396,25 @@ func convert(v any, typ reflect.Type) reflect.Value {
 
 func convertValue(v reflect.Value, typ reflect.Type) reflect.Value {
 	return reflect.NewAt(typ, v.UnsafePointer())
+}
+
+func bluePrint(t reflect.Type) []reflect.Type {
+	var out []reflect.Type
+	for hasElem(t.Kind()) {
+		out = append(out, t)
+		t = t.Elem()
+	}
+	slices.Reverse(out)
+	return out
+}
+
+func concreteType(t reflect.Type) reflect.Type {
+	for hasElem(t.Kind()) {
+		t = t.Elem()
+	}
+	return t
+}
+
+func hasElem(k reflect.Kind) bool {
+	return k == reflect.Pointer || k == reflect.Array || k == reflect.Slice
 }
