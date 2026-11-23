@@ -10,12 +10,12 @@ func DefineExport() static.Schema {
 		Description: "Test Description",
 		Properties: static.Properties{
 			"products": static.Array[static.Array[static.Composite]]{
-				Required: true,
 				Items: static.Array[static.Composite]{
 					Items: static.Composite{
 						Properties: static.Properties{
 							"Name": static.Scalar{
-								Type: static.BasicTypes{static.TypeString},
+								Required: true,
+								Type:     static.BasicTypes{static.TypeString},
 							},
 						},
 					},
