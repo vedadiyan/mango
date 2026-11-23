@@ -5,7 +5,6 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"unsafe"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -21,7 +20,7 @@ type (
 	}
 
 	CycleLoopDetector map[reflect.Type]*reflect.Type
-	CycleLoopHandlers []func()
+	CycleLoopHandlers []func() error
 )
 
 var (
@@ -29,36 +28,16 @@ var (
 	metadataType = reflect.TypeFor[Metadata]()
 	typeCache    = make(map[reflect.Type]reflect.Type)
 	emptyType    = reflect.PointerTo(reflect.TypeFor[struct{}]())
-	abi          reflect.Type
 	mut          sync.Mutex
 )
 
-//go:linkname typelinks reflect.typelinks
-func typelinks() (sections []unsafe.Pointer, offset [][]int32)
-
-//go:linkname resolveTypeOff reflect.resolveTypeOff
-func resolveTypeOff(rtype unsafe.Pointer, off int32) unsafe.Pointer
-
-//go:linkname toType reflect.toType
-func toType(t unsafe.Pointer) reflect.Type
-
-func init() {
-	sections, offsets := typelinks()
-	for i, base := range sections {
-		for _, off := range offsets[i] {
-			if t := toType(unsafe.Add(base, uintptr(off))).Elem(); t.String() == "abi.StructType" {
-				abi = t
-				return
-			}
+func (clh CycleLoopHandlers) inject() error {
+	for _, fn := range clh {
+		if err := fn(); err != nil {
+			return err
 		}
 	}
-	panic("abi.StructType not found in runtime typelinks")
-}
-
-func (clh CycleLoopHandlers) inject() {
-	for _, fn := range clh {
-		fn()
-	}
+	return nil
 }
 
 func (cld CycleLoopDetector) Track(typ reflect.Type, finalType *reflect.Type) {
@@ -170,7 +149,9 @@ func AutoInliner(src reflect.Type) (reflect.Type, error) {
 	if err != nil {
 		return nil, err
 	}
-	clh.inject()
+	if err := clh.inject(); err != nil {
+		return nil, err
+	}
 	typeCache[src] = typ
 	return typ, nil
 }
@@ -245,8 +226,8 @@ func rewriteStruct(src reflect.Type, cld CycleLoopDetector) (reflect.Type, Cycle
 
 		ityp := concreteType(typ)
 		if val, ok := cld.Has(ityp); ok {
-			clh = append(clh, func() {
-				patch(&finalResult, i, typ, val)
+			clh = append(clh, func() error {
+				return abiPatch(&finalResult, i, typ, val)
 			})
 
 			out = append(out, reflect.StructField{
@@ -312,31 +293,6 @@ func rewriteStruct(src reflect.Type, cld CycleLoopDetector) (reflect.Type, Cycle
 	finalResult = reflect.StructOf(out)
 	typeCache[src] = finalResult
 	return finalResult, clh, nil
-}
-
-func patch(structType *reflect.Type, fieldIndex int, fieldType reflect.Type, concreteType *reflect.Type) {
-	bl := bluePrint(fieldType)
-	typ := reflect.NewAt(abi, reflect.ValueOf(*structType).UnsafePointer()).Elem()
-	f := typ.FieldByName("Fields").Index(fieldIndex).FieldByName("Typ")
-	addr := (*unsafe.Pointer)(f.Addr().UnsafePointer())
-	ptr := *concreteType
-	for _, i := range bl {
-		switch i.Kind() {
-		case reflect.Pointer:
-			{
-				ptr = reflect.PointerTo(ptr)
-			}
-		case reflect.Slice:
-			{
-				ptr = reflect.SliceOf(ptr)
-			}
-		case reflect.Array:
-			{
-				ptr = reflect.ArrayOf(i.Len(), ptr)
-			}
-		}
-	}
-	*addr = reflect.ValueOf(ptr).UnsafePointer()
 }
 
 func indirect(src reflect.Type) (reflect.Type, int) {
