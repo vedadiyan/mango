@@ -42,10 +42,10 @@ type (
 
 	// StructField describes a single field of a struct being rewritten.
 	StructField struct {
-		Field      *reflect.StructField
-		FieldIndex int
-		StructType *reflect.Type
-		Rewriter   *Rewriter
+		field      *reflect.StructField
+		fieldIndex int
+		structType *reflect.Type
+		rewriter   *Rewriter
 	}
 
 	// LoopHandlerPolicy controls how Rewrite handles circular type references.
@@ -182,43 +182,43 @@ func (w *Rewriter) structRewrite(src reflect.Type) (reflect.Type, error) {
 // CircRefHndlrPolicy.
 func (sf *StructField) Build() (*reflect.StructField, error) {
 	// Opaque fields are left unchanged.
-	if tag, ok := sf.Field.Tag.Lookup("bson"); ok && isOpaque(tag) {
-		return sf.Field, nil
+	if tag, ok := sf.field.Tag.Lookup("bson"); ok && isOpaque(tag) {
+		return sf.field, nil
 	}
 
 	// Not a circular reference: rewrite the field type normally.
-	val, ok := sf.Rewriter.ld.has(concreteType(sf.Field.Type))
+	val, ok := sf.rewriter.ld.has(concreteType(sf.field.Type))
 	if !ok {
-		res, err := sf.Rewriter.typeRewrite(sf.Field.Type)
+		res, err := sf.rewriter.typeRewrite(sf.field.Type)
 		if err != nil {
 			return nil, err
 		}
-		sf.Field.Type = res
-		sf.Field.Tag = getTagValue(sf.Field)
-		return sf.Field, nil
+		sf.field.Type = res
+		sf.field.Tag = getTagValue(sf.field)
+		return sf.field, nil
 	}
 
 	// Circular reference: apply the configured policy.
-	if sf.Rewriter.lhp == LoopHandlerPolicyBlock {
+	if sf.rewriter.lhp == LoopHandlerPolicyBlock {
 		return nil, fmt.Errorf("circular references are not allowed")
 	}
 
 	// Defer patching the field type until all types have been built.
-	if sf.Rewriter.lhp == LoopHandlerPolicyHandle {
-		ref := sf.Field.Type
-		sf.Rewriter.lh = append(sf.Rewriter.lh, func() error {
-			return abiPatch(sf.StructType, sf.FieldIndex, ref, val)
+	if sf.rewriter.lhp == LoopHandlerPolicyHandle {
+		ref := sf.field.Type
+		sf.rewriter.lh = append(sf.rewriter.lh, func() error {
+			return abiPatch(sf.structType, sf.fieldIndex, ref, val)
 		})
 	}
 
 	// Hide the field by making it blank and unexported.
-	if sf.Rewriter.lhp == LoopHandlerPolicyIgnore {
-		sf.Field.Name = "_"
-		sf.Field.PkgPath = "_"
+	if sf.rewriter.lhp == LoopHandlerPolicyIgnore {
+		sf.field.Name = "_"
+		sf.field.PkgPath = "_"
 	}
 
-	sf.Field.Type = nilType
-	return sf.Field, nil
+	sf.field.Type = nilType
+	return sf.field, nil
 }
 
 // getTagValue returns the struct tag for a rewritten field. In order of
