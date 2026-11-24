@@ -189,12 +189,12 @@ func (sf *StructField) Build() (*reflect.StructField, error) {
 	// Not a circular reference: rewrite the field type normally.
 	val, ok := sf.rewriter.loopDetector.has(concreteType(sf.field.Type))
 	if !ok {
+		sf.field.Anonymous, sf.field.Tag = getAnonymityAndTag(sf.field)
 		res, err := sf.rewriter.typeRewrite(sf.field.Type)
 		if err != nil {
 			return nil, err
 		}
 		sf.field.Type = res
-		sf.field.Tag = getTagValue(sf.field)
 		return sf.field, nil
 	}
 
@@ -221,29 +221,29 @@ func (sf *StructField) Build() (*reflect.StructField, error) {
 	return sf.field, nil
 }
 
-// getTagValue returns the struct tag for a rewritten field. In order of
+// getAnonymityAndTag returns the struct tag for a rewritten field. In order of
 // precedence:
 //   - the tag supplied through Metadata, for non-anonymous fields;
 //   - `bson:"-"` for Metadata fields and blank (_) fields;
 //   - `bson:",inline"` for anonymous fields;
 //   - otherwise, the field's original tag.
-func getTagValue(field *reflect.StructField) reflect.StructTag {
+func getAnonymityAndTag(field *reflect.StructField) (bool, reflect.StructTag) {
 	// A Metadata tag overrides the field's own tag, allowing tags in places
 	// the Go language does not permit them.
 	if tagValue, ok := isMetadata(field.Type); ok && !field.Anonymous {
-		return tagValue
+		return false, tagValue
 	}
 
 	// Metadata fields are used for tagging only and are never encoded.
 	if field.Type.Implements(metadataType) || field.Name == "_" {
-		return reflect.StructTag(`bson:"-"`)
+		return false, reflect.StructTag(`bson:"-"`)
 	}
 
 	if field.Anonymous {
-		return reflect.StructTag(`bson:",inline"`)
+		return true, reflect.StructTag(`bson:",inline"`)
 	}
 
-	return field.Tag
+	return field.Anonymous, field.Tag
 }
 
 // isMetadata reports whether src, or the element type of a pointer, slice or
@@ -262,13 +262,12 @@ func isMetadata(src reflect.Type) (reflect.StructTag, bool) {
 	case reflect.Struct:
 		{
 			for f := range src.Fields() {
-				if !f.Anonymous || !f.Type.AssignableTo(metadataType) {
-					continue
+				if f.Anonymous && f.Type == metadataType {
+					return f.Tag, true
 				}
-				for innerField := range f.Type.Fields() {
-					if innerField.Type.Implements(metadataType) {
-						return innerField.Tag, true
-					}
+				tag, ok := isMetadata(f.Type)
+				if ok {
+					return tag, ok
 				}
 			}
 			return "", false
