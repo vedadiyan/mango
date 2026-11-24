@@ -30,6 +30,9 @@ type (
 // track marks typ as in progress. finalType points to where its rewritten
 // type will be stored.
 func (ld LoopDetector) track(typ reflect.Type, finalType *reflect.Type) {
+	if _, ok := ld[typ]; ok {
+		return
+	}
 	ld[typ] = finalType
 }
 
