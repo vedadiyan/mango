@@ -1,3 +1,17 @@
+// Copyright 2026 Pouya Vedadiyan. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package codegen
 
 import (
@@ -13,30 +27,43 @@ import (
 )
 
 type (
+	// ParserContext holds a parsed and type-checked Go source file.
 	ParserContext struct {
 		Ast         *ast.File
 		Info        *types.Info
 		PackageName string
 	}
+
+	// KeyValue is a parsed key-value element of a composite literal.
 	KeyValue struct {
 		Key   string
 		Value any
 	}
+
+	// TypedParam is a parsed composite literal and its fully qualified type
+	// name. Value is a RawSchema for struct and map literals, or []any for
+	// slice and array literals.
 	TypedParam struct {
 		TypeName string
 		Value    any
 	}
-	RawSchema  map[string]any
+
+	// RawSchema maps the keys of a parsed struct or map literal to their
+	// parsed values.
+	RawSchema map[string]any
+
+	// Properties maps property names to their schemas.
 	Properties map[string]TypedParam
-	Items      []TypedParam
+
+	// Items is a list of item schemas.
+	Items []TypedParam
 )
 
+// Fully qualified names of the schema types recognized by the parser.
 const (
 	ScalarType    = "github.com/vedadiyan/mango/static.Scalar"
 	CompositeType = "github.com/vedadiyan/mango/static.Composite"
-	// ScalarArrayType     = "github.com/vedadiyan/mango/static.Array[github.com/vedadiyan/mango/static.Scalar]"
-	// CompositArrayType   = "github.com/vedadiyan/mango/static.Array[github.com/vedadiyan/mango/static.Composite]"
-	// PositionalArrayType = "github.com/vedadiyan/mango/static.Array[github.com/vedadiyan/mango/static.Positional]"
+
 	OneOf = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.OneOf]"
 	AnyOf = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.AnyOf]"
 	AllOf = "github.com/vedadiyan/mango/static.Combinator[github.com/vedadiyan/mango/static.AllOf]"
@@ -44,9 +71,13 @@ const (
 )
 
 var (
+	// arrayPattern matches a static.Array instantiation and captures its
+	// element type.
 	arrayPattern = regexp.MustCompile(`^(github\.com\/vedadiyan\/mango\/static\.Array\[)(.*)(\])`)
 )
 
+// Parse parses and type-checks the Go source file at filePath. Imports are
+// resolved from source.
 func Parse(filePath string) (*ParserContext, error) {
 	fset := token.NewFileSet()
 	parsedAst, err := parser.ParseFile(fset, filePath, nil, parser.ParseComments)
@@ -72,6 +103,8 @@ func Parse(filePath string) (*ParserContext, error) {
 	return &ParserContext{parsedAst, &info, parsedAst.Name.String()}, nil
 }
 
+// ExtractFuncs returns the top-level function and method declarations in
+// the file. The returned error is always nil.
 func (pc *ParserContext) ExtractFuncs() ([]*ast.FuncDecl, error) {
 	out := make([]*ast.FuncDecl, 0)
 	for _, decl := range pc.Ast.Decls {
@@ -82,6 +115,9 @@ func (pc *ParserContext) ExtractFuncs() ([]*ast.FuncDecl, error) {
 	return out, nil
 }
 
+// ParseBasicLit returns the value of a basic literal: a string for string
+// and rune literals, an int64 for integer literals and a float64 for
+// floating-point literals.
 func (pc *ParserContext) ParseBasicLit(bl *ast.BasicLit) (any, error) {
 	switch bl.Kind {
 	case token.STRING, token.CHAR:
@@ -113,6 +149,8 @@ func (pc *ParserContext) ParseBasicLit(bl *ast.BasicLit) (any, error) {
 	}
 }
 
+// ParseVar returns the name of the struct field vr. Other variables are
+// rejected because their values are not known statically.
 func (pc *ParserContext) ParseVar(vr *types.Var, ident *ast.Ident) (string, error) {
 	if !vr.IsField() {
 		return "", fmt.Errorf("`%s` is not statically typed", ident.String())
@@ -121,6 +159,9 @@ func (pc *ParserContext) ParseVar(vr *types.Var, ident *ast.Ident) (string, erro
 	return vr.Name(), nil
 }
 
+// ParseIdent resolves ident to either a constant value or a struct field
+// name. Constants yield an int64, float64, bool, complex128 or string.
+// origin is currently unused.
 func (pc *ParserContext) ParseIdent(ident *ast.Ident, origin ast.Expr) (any, error) {
 	data, ok := pc.Info.Uses[ident]
 	if !ok {
@@ -162,6 +203,8 @@ func (pc *ParserContext) ParseIdent(ident *ast.Ident, origin ast.Expr) (any, err
 	}
 }
 
+// ParseKeyValue parses a key-value element of a composite literal. The key
+// must resolve to a string, such as a struct field name.
 func (pc *ParserContext) ParseKeyValue(kv *ast.KeyValueExpr, origin ast.Expr) (*KeyValue, error) {
 	key, err := pc.ParseExpr(kv.Key, origin)
 	if err != nil {
@@ -180,6 +223,7 @@ func (pc *ParserContext) ParseKeyValue(kv *ast.KeyValueExpr, origin ast.Expr) (*
 	return &KeyValue{keyStr, value}, nil
 }
 
+// ParseCompositLit parses the elements of a slice or array literal.
 func (pc *ParserContext) ParseCompositLit(current *ast.CompositeLit) ([]any, error) {
 	out := make([]any, 0)
 	for _, i := range current.Elts {
@@ -192,6 +236,8 @@ func (pc *ParserContext) ParseCompositLit(current *ast.CompositeLit) ([]any, err
 	return out, nil
 }
 
+// ParseCompositLitAsMap parses a struct or map literal whose elements are
+// all key-value pairs.
 func (pc *ParserContext) ParseCompositLitAsMap(current *ast.CompositeLit) (RawSchema, error) {
 	out := make(RawSchema)
 	for _, i := range current.Elts {
@@ -208,6 +254,9 @@ func (pc *ParserContext) ParseCompositLitAsMap(current *ast.CompositeLit) (RawSc
 	return out, nil
 }
 
+// ParseExpr parses a statically known expression into a Go value. Composite
+// literals become a TypedParam, and a leading & is ignored. origin is the
+// enclosing composite literal, or nil at the top level.
 func (pc *ParserContext) ParseExpr(current ast.Expr, origin ast.Expr) (any, error) {
 	switch t := current.(type) {
 	case *ast.BasicLit:
@@ -266,18 +315,24 @@ func (pc *ParserContext) ParseExpr(current ast.Expr, origin ast.Expr) (any, erro
 	}
 }
 
+// GetTitle returns the schema's Title, or nil if it is not set.
 func (r RawSchema) GetTitle() (*string, error) {
 	return r.LookupCast[string]("Title")
 }
 
+// GetDescription returns the schema's Description, or nil if it is not set.
 func (r RawSchema) GetDescription() (*string, error) {
 	return r.LookupCast[string]("Description")
 }
 
+// GetSchema returns r's value as a RawSchema.
 func (r TypedParam) GetSchema() (*RawSchema, error) {
 	return Cast[RawSchema](r.Value)
 }
 
+// GetRequired returns the schema's Required flag, or nil if it is not set.
+// For object schemas, where Required lists property names, use
+// RawSchema.GetRequiredStringArray.
 func (r TypedParam) GetRequired() (*bool, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
@@ -286,6 +341,8 @@ func (r TypedParam) GetRequired() (*bool, error) {
 	return innerSchema.LookupCast[bool]("Required")
 }
 
+// GetRequiredOrFalse is like GetRequired but returns false when Required is
+// not set or is not a bool.
 func (r TypedParam) GetRequiredOrFalse() (bool, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
@@ -304,6 +361,8 @@ func (r TypedParam) GetRequiredOrFalse() (bool, error) {
 	}
 }
 
+// GetRequiredStringArray returns the property names listed in Required, or
+// nil if Required is not set or is not a list.
 func (r RawSchema) GetRequiredStringArray() ([]string, error) {
 	required := r.Lookup("Required")
 	if required == nil {
@@ -333,6 +392,7 @@ func (r RawSchema) GetRequiredStringArray() ([]string, error) {
 	}
 }
 
+// GetMinLen returns the schema's MinLen, or nil if it is not set.
 func (r TypedParam) GetMinLen() (*int64, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
@@ -341,6 +401,7 @@ func (r TypedParam) GetMinLen() (*int64, error) {
 	return innerSchema.LookupCast[int64]("MinLen")
 }
 
+// GetMaxLen returns the schema's MaxLen, or nil if it is not set.
 func (r TypedParam) GetMaxLen() (*int64, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
@@ -349,6 +410,7 @@ func (r TypedParam) GetMaxLen() (*int64, error) {
 	return innerSchema.LookupCast[int64]("MaxLen")
 }
 
+// GetMin returns the schema's Min, or nil if it is not set.
 func (r TypedParam) GetMin() (*int64, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
@@ -357,6 +419,7 @@ func (r TypedParam) GetMin() (*int64, error) {
 	return innerSchema.LookupCast[int64]("Min")
 }
 
+// GetMax returns the schema's Max, or nil if it is not set.
 func (r TypedParam) GetMax() (*int64, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
@@ -365,6 +428,7 @@ func (r TypedParam) GetMax() (*int64, error) {
 	return innerSchema.LookupCast[int64]("Max")
 }
 
+// GetExclusiveMin returns the schema's ExclusiveMin flag, or nil if it is not set.
 func (r TypedParam) GetExclusiveMin() (*bool, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
@@ -373,6 +437,7 @@ func (r TypedParam) GetExclusiveMin() (*bool, error) {
 	return innerSchema.LookupCast[bool]("ExclusiveMin")
 }
 
+// GetExclusiveMax returns the schema's ExclusiveMax flag, or nil if it is not set.
 func (r TypedParam) GetExclusiveMax() (*bool, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
@@ -381,6 +446,7 @@ func (r TypedParam) GetExclusiveMax() (*bool, error) {
 	return innerSchema.LookupCast[bool]("ExclusiveMax")
 }
 
+// GetMultipleOf returns the schema's MultipleOf, or nil if it is not set.
 func (r TypedParam) GetMultipleOf() (*float64, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
@@ -389,6 +455,7 @@ func (r TypedParam) GetMultipleOf() (*float64, error) {
 	return innerSchema.LookupCast[float64]("MultipleOf")
 }
 
+// GetPattern returns the schema's Pattern, or nil if it is not set.
 func (r TypedParam) GetPattern() (*string, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
@@ -397,6 +464,7 @@ func (r TypedParam) GetPattern() (*string, error) {
 	return innerSchema.LookupCast[string]("Pattern")
 }
 
+// GetMinItems returns the schema's MinItems, or nil if it is not set.
 func (r TypedParam) GetMinItems() (*int64, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
@@ -405,6 +473,7 @@ func (r TypedParam) GetMinItems() (*int64, error) {
 	return innerSchema.LookupCast[int64]("MinItems")
 }
 
+// GetMaxItems returns the schema's MaxItems, or nil if it is not set.
 func (r TypedParam) GetMaxItems() (*int64, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
@@ -413,6 +482,7 @@ func (r TypedParam) GetMaxItems() (*int64, error) {
 	return innerSchema.LookupCast[int64]("MaxItems")
 }
 
+// GetUniqueItems returns the schema's UniqueItems flag, or nil if it is not set.
 func (r TypedParam) GetUniqueItems() (*bool, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
@@ -421,6 +491,7 @@ func (r TypedParam) GetUniqueItems() (*bool, error) {
 	return innerSchema.LookupCast[bool]("UniqueItems")
 }
 
+// GetMinProperties returns the schema's MinProperties, or nil if it is not set.
 func (r TypedParam) GetMinProperties() (*int64, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
@@ -429,6 +500,7 @@ func (r TypedParam) GetMinProperties() (*int64, error) {
 	return innerSchema.LookupCast[int64]("MinProperties")
 }
 
+// GetMaxProperties returns the schema's MaxProperties, or nil if it is not set.
 func (r TypedParam) GetMaxProperties() (*int64, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
@@ -437,6 +509,7 @@ func (r TypedParam) GetMaxProperties() (*int64, error) {
 	return innerSchema.LookupCast[int64]("MaxProperties")
 }
 
+// GetAdditionalItems returns the schema's AdditionalItems flag, or nil if it is not set.
 func (r TypedParam) GetAdditionalItems() (*bool, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
@@ -445,6 +518,7 @@ func (r TypedParam) GetAdditionalItems() (*bool, error) {
 	return innerSchema.LookupCast[bool]("AdditionalItems")
 }
 
+// GetAdditionalProperties returns the schema's AdditionalProperties flag, or nil if it is not set.
 func (r TypedParam) GetAdditionalProperties() (*bool, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
@@ -453,6 +527,7 @@ func (r TypedParam) GetAdditionalProperties() (*bool, error) {
 	return innerSchema.LookupCast[bool]("AdditionalProperties")
 }
 
+// GetEnum returns the values listed in the schema's Enum, or nil if it is not set.
 func (r TypedParam) GetEnum() ([]any, error) {
 	innerSchema, err := Cast[RawSchema](r.Value)
 	if err != nil {
@@ -475,6 +550,7 @@ func (r TypedParam) GetEnum() ([]any, error) {
 	return *values, nil
 }
 
+// IsCombinator reports whether r is a OneOf, AnyOf, AllOf or Not combinator.
 func (r TypedParam) IsCombinator() bool {
 	switch r.TypeName {
 	case OneOf, AnyOf, AllOf, Not:
@@ -488,10 +564,13 @@ func (r TypedParam) IsCombinator() bool {
 	}
 }
 
+// IsArray reports whether r is a static.Array of scalars, composites or nested arrays.
 func (r TypedParam) IsArray() bool {
 	return isArray(r.TypeName)
 }
 
+// isArray reports whether typeName is a static.Array whose element type is
+// Scalar, Composite or, recursively, another such array.
 func isArray(typeName string) bool {
 	subMatches := arrayPattern.FindStringSubmatch(typeName)
 	if len(subMatches) != 4 {
@@ -512,19 +591,7 @@ func isArray(typeName string) bool {
 	}
 }
 
-// func (r TypedParam) IsScalar() bool {
-// 	switch r.TypeName {
-// 	case ScalarArrayType, CompositArrayType, PositionalArrayType, CompositeType, OneOf, AnyOf, AllOf, Not:
-// 		{
-// 			return false
-// 		}
-// 	default:
-// 		{
-// 			return true
-// 		}
-// 	}
-// }
-
+// IsObject reports whether r is a composite (object) schema.
 func (r TypedParam) IsObject() bool {
 	switch r.TypeName {
 	case CompositeType:
@@ -538,6 +605,10 @@ func (r TypedParam) IsObject() bool {
 	}
 }
 
+// GetType returns the JSON Schema type names for r: "array" for arrays,
+// "object" for composites and the combinator name for combinators. For
+// scalars, it returns the values listed in the Type field, or nil if Type is
+// not set.
 func (r TypedParam) GetType() ([]string, error) {
 	if r.IsArray() {
 		return []string{"array"}, nil
@@ -599,6 +670,7 @@ func (r TypedParam) GetType() ([]string, error) {
 	return out, nil
 }
 
+// GetOneOfs returns the schema's OneOf combinator, or nil if it is not set.
 func (r TypedParam) GetOneOfs() (*TypedParam, error) {
 	rawSchema, err := r.GetSchema()
 	if err != nil {
@@ -614,6 +686,7 @@ func (r TypedParam) GetOneOfs() (*TypedParam, error) {
 	return oneOfs, nil
 }
 
+// GetAnyOfs returns the schema's AnyOf combinator, or nil if it is not set.
 func (r TypedParam) GetAnyOfs() (*TypedParam, error) {
 	rawSchema, err := r.GetSchema()
 	if err != nil {
@@ -629,6 +702,7 @@ func (r TypedParam) GetAnyOfs() (*TypedParam, error) {
 	return oneOfs, nil
 }
 
+// GetAllOfs returns the schema's AllOf combinator, or nil if it is not set.
 func (r TypedParam) GetAllOfs() (*TypedParam, error) {
 	rawSchema, err := r.GetSchema()
 	if err != nil {
@@ -644,6 +718,7 @@ func (r TypedParam) GetAllOfs() (*TypedParam, error) {
 	return oneOfs, nil
 }
 
+// GetNots returns the schema's Not combinator, or nil if it is not set.
 func (r TypedParam) GetNots() (*TypedParam, error) {
 	rawSchema, err := r.GetSchema()
 	if err != nil {
@@ -659,6 +734,8 @@ func (r TypedParam) GetNots() (*TypedParam, error) {
 	return oneOfs, nil
 }
 
+// GetRootCombinators returns the combinators set on the schema, in the order
+// OneOf, AnyOf, AllOf, Not.
 func (r TypedParam) GetRootCombinators() ([]TypedParam, error) {
 	out := make([]TypedParam, 0)
 
@@ -697,6 +774,7 @@ func (r TypedParam) GetRootCombinators() ([]TypedParam, error) {
 	return out, nil
 }
 
+// GetProperties returns the schema's Properties, or nil if it is not set.
 func (r RawSchema) GetProperties() (Properties, error) {
 	typedParam, err := r.LookupCast[TypedParam]("Properties")
 	if err != nil {
@@ -721,6 +799,8 @@ func (r RawSchema) GetProperties() (Properties, error) {
 	return properties, nil
 }
 
+// GetConditions returns the schema's Conditions as plain maps, with nested
+// schemas converted recursively. It returns nil if Conditions is not set.
 func (r RawSchema) GetConditions() ([]map[string]any, error) {
 	typedParam, err := r.LookupCast[TypedParam]("Conditions")
 	if err != nil {
@@ -736,9 +816,12 @@ func (r RawSchema) GetConditions() ([]map[string]any, error) {
 	return parseCondition(items)
 }
 
+// GetObjectName returns the schema's ObjectName, or nil if it is not set.
 func (r RawSchema) GetObjectName() (*string, error) {
 	return r.LookupCast[string]("ObjectName")
 }
+
+// parseCondition converts a list of condition literals to plain maps.
 func parseCondition(rawSchema []any) ([]map[string]any, error) {
 	items := make([]map[string]any, 0)
 	for _, value := range rawSchema {
@@ -759,6 +842,7 @@ func parseCondition(rawSchema []any) ([]map[string]any, error) {
 	return items, nil
 }
 
+// getConditions converts r to a plain map, converting nested schemas recursively.
 func (r RawSchema) getConditions() (map[string]any, error) {
 	items := make(map[string]any, 0)
 	for key, value := range r {
@@ -789,6 +873,8 @@ func (r RawSchema) getConditions() (map[string]any, error) {
 	return items, nil
 }
 
+// getConditions converts r to a list of plain maps. A schema yields one map;
+// a list yields one or more maps per element.
 func (r TypedParam) getConditions() ([]map[string]any, error) {
 	switch t := r.Value.(type) {
 	case RawSchema:
@@ -827,6 +913,9 @@ func (r TypedParam) getConditions() ([]map[string]any, error) {
 
 }
 
+// GetItems returns the schema's Items: a TypedParam for a single item
+// schema, or Items for a list of item schemas. It returns nil if Items is
+// not set.
 func (r RawSchema) GetItems() (any, error) {
 	typedParam, err := r.LookupCast[TypedParam]("Items")
 	if err != nil {
@@ -848,6 +937,7 @@ func (r RawSchema) GetItems() (any, error) {
 	}
 }
 
+// GetAllowNull returns the schema's AllowNull flag, or false if it is not set.
 func (r RawSchema) GetAllowNull() (bool, error) {
 	value, err := r.LookupCast[bool]("AllowNull")
 	if err != nil {
@@ -860,6 +950,8 @@ func (r RawSchema) GetAllowNull() (bool, error) {
 	return *value, nil
 }
 
+// GetItemsAsArray is like GetItems but always returns a list, wrapping a
+// single item schema in a one-element list.
 func (r RawSchema) GetItemsAsArray() (Items, error) {
 	typedParam, err := r.LookupCast[TypedParam]("Items")
 	if err != nil {
@@ -881,6 +973,7 @@ func (r RawSchema) GetItemsAsArray() (Items, error) {
 	}
 }
 
+// getItemsArray converts a list of item literals to Items.
 func (r RawSchema) getItemsArray(rawSchema []any) (Items, error) {
 	items := make(Items, 0)
 	for _, value := range rawSchema {
@@ -897,6 +990,7 @@ func (r RawSchema) getItemsArray(rawSchema []any) (Items, error) {
 	return items, nil
 }
 
+// GetSpecs returns the schema's Specs, or nil if it is not set.
 func (r RawSchema) GetSpecs() (Items, error) {
 	typedParam, err := r.LookupCast[TypedParam]("Specs")
 	if err != nil {
@@ -924,6 +1018,8 @@ func (r RawSchema) GetSpecs() (Items, error) {
 	return items, nil
 }
 
+// GetDependencies returns the schema's Dependencies, mapping each property
+// to the properties it requires. It returns nil if Dependencies is not set.
 func (r RawSchema) GetDependencies() (map[string][]string, error) {
 	typedParam, err := r.LookupCast[TypedParam]("Dependencies")
 	if err != nil {
@@ -966,6 +1062,8 @@ func (r RawSchema) GetDependencies() (map[string][]string, error) {
 	return dependencies, nil
 }
 
+// Cast returns a pointer to a copy of v asserted to type T, or an error if v
+// is not a T.
 func Cast[T any](v any) (*T, error) {
 	val, ok := v.(T)
 	if !ok {
@@ -975,6 +1073,7 @@ func Cast[T any](v any) (*T, error) {
 	return &val, nil
 }
 
+// CopyCast is like Cast but returns the value instead of a pointer.
 func CopyCast[T any](v any) (T, error) {
 	val, ok := v.(T)
 	if !ok {
@@ -984,10 +1083,13 @@ func CopyCast[T any](v any) (T, error) {
 	return val, nil
 }
 
+// LookupCast is like the LookupCast function, using r as the map.
 func (r RawSchema) LookupCast[T any](key string) (*T, error) {
 	return LookupCast[T](key, r)
 }
 
+// LookupCast returns the value stored under key in mapper, asserted to type
+// T. It returns nil and no error if key is not present.
 func LookupCast[T any, R any](key string, mapper map[string]R) (*T, error) {
 	val, ok := mapper[key]
 	if !ok {
@@ -996,6 +1098,7 @@ func LookupCast[T any, R any](key string, mapper map[string]R) (*T, error) {
 	return Cast[T](val)
 }
 
+// Lookup returns the value stored under key, or nil if it is not present.
 func (r RawSchema) Lookup(key string) any {
 	return r[key]
 }

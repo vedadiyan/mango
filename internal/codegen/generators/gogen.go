@@ -1,3 +1,17 @@
+// Copyright 2026 Pouya Vedadiyan. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package generators
 
 import (
@@ -21,33 +35,47 @@ import (
 )
 
 type (
+	// GoBasicType, GoStructType and GoArrayType name Go types in generated code.
 	GoBasicType  string
 	GoStructType string
 	GoArrayType  string
 
+	// Types is the model of the code to generate. It maps each type name to
+	// its fields, and each field name to its Go type and struct tag.
+	//
+	// Keys starting with "$" describe enums: the map holds the enum's
+	// constants and its underlying type under "$type".
 	Types map[string]map[string][2]string
 
+	// CombinatorType names a schema combinator.
 	CombinatorType string
 
+	// GoTypeOptions configures GetGoType.
 	GoTypeOptions struct {
-		optional string
+		optional string // "*" if the type is optional
 	}
 
+	// GoTypeOption configures GetGoType.
 	GoTypeOption func(*GoTypeOptions)
-	GoTagOption  func(*[]string)
 
+	// GoTagOption adds options to a struct tag built by GetTags.
+	GoTagOption func(*[]string)
+
+	// Field describes a field of a generated struct.
 	Field struct {
 		Name string
 		Type string
 		Tags string
 	}
 
+	// GoGenModel is the data passed to the code generation template.
 	GoGenModel struct {
 		PackageName string
 		ImportList  []string
 		Fields      Types
 	}
 
+	// ConcreteType is an element type together with its array depth.
 	ConcreteType struct {
 		Type  string
 		Depth int
@@ -55,8 +83,10 @@ type (
 )
 
 const (
+	// EmptyString is the empty string.
 	EmptyString = ""
 
+	// Supported combinator types.
 	CombinatorTypeInavlid CombinatorType = "Invalid"
 	CombinatorTypeOneOf   CombinatorType = "OneOf"
 	CombinatorTypeAnyOf   CombinatorType = "AnyOf"
@@ -64,6 +94,7 @@ const (
 	CombinatorTypeNot     CombinatorType = "Not"
 )
 
+// Go type names used in generated code.
 const (
 	TimeType       = "time.Time"
 	ObjectIdType   = "bson.ObjectID"
@@ -96,7 +127,10 @@ const (
 var (
 	//go:embed gogen.go.tmpl
 	goGenTemplate string
-	opaqueTypes   = []string{
+
+	// opaqueTypes are encoded as-is and tagged "opaque" so the codec does
+	// not rewrite them.
+	opaqueTypes = []string{
 		TimeType,
 		ObjectIdType,
 		BsonAType,
@@ -104,6 +138,9 @@ var (
 		BsonDType,
 		BsonMType,
 	}
+
+	// systemTypes are built-in and well-known types, left unchanged by the
+	// genericType template function.
 	systemTypes = []string{
 		BoolType,
 		IntType,
@@ -128,6 +165,14 @@ var (
 	}
 )
 
+// TemplateFunctions returns the functions available to the code generation
+// template:
+//
+//   - hasPrefix, trimPrefix: wrappers for strings.HasPrefix and TrimPrefix.
+//   - genericType: replaces a non-system element type with T, keeping any
+//     pointer and slice prefix (for example, []*Foo becomes []*T).
+//   - arraySymbol: returns the pointer and slice prefix of a type.
+//   - dict: builds a map from alternating keys and values.
 func TemplateFunctions() template.FuncMap {
 	splitPattern := regexp.MustCompile(`([\*\[\]]*)`)
 	arrayPattern := regexp.MustCompile(`^([\*\[\]]{2,})+`)
@@ -158,6 +203,9 @@ func TemplateFunctions() template.FuncMap {
 	}
 }
 
+// GoGenRender renders types as Go source in package packageName, writes it
+// to fileName.autogen.go and formats it with gofmt run in dir. It panics on
+// failure.
 func GoGenRender(dir string, fileName string, packageName string, types Types) {
 	tmpl := template.New(uuid.New().String())
 	tmpl.Funcs(TemplateFunctions())
@@ -182,6 +230,9 @@ func GoGenRender(dir string, fileName string, packageName string, types Types) {
 	}
 }
 
+// ToGoTypeModel builds the type model for the object schema in. parents is
+// the path of enclosing type names, which prefixes generated type names. If
+// forceOptional is true, all fields are optional.
 func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) (Types, error) {
 	schema, err := in.GetSchema()
 	if err != nil {
@@ -320,6 +371,9 @@ func ToGoTypeModel(in codegen.TypedParam, parents []string, forceOptional bool) 
 	return out, nil
 }
 
+// ToGoArrayType builds the type model for the array field explicitKey
+// described by value. dim records, for each enclosing array dimension,
+// whether its elements may be null. opts configure the field's struct tag.
 func ToGoArrayType(dim []bool, explicitKey string, value codegen.TypedParam, parents []string, opts ...GoTagOption) (Types, error) {
 	if strings.TrimSpace(explicitKey) == EmptyString {
 		return nil, fmt.Errorf("array definition requires a key")
@@ -412,6 +466,9 @@ func ToGoArrayType(dim []bool, explicitKey string, value codegen.TypedParam, par
 	return out, nil
 }
 
+// ToGoCombinatorType builds the type model for a combinator. If explicitKey
+// is empty, the combinator's fields are merged into the parent type;
+// otherwise they form a new type referenced by field explicitKey.
 func ToGoCombinatorType(explicitKey string, value codegen.TypedParam, parents []string) (Types, error) {
 	schema, err := value.GetSchema()
 	if err != nil {
@@ -521,6 +578,7 @@ func ToGoCombinatorType(explicitKey string, value codegen.TypedParam, parents []
 	return out, nil
 }
 
+// WithRequired makes the type a pointer unless required is true.
 func WithRequired(required bool) GoTypeOption {
 	return func(gto *GoTypeOptions) {
 		if !required {
@@ -529,6 +587,9 @@ func WithRequired(required bool) GoTypeOption {
 	}
 }
 
+// GetGoType maps schema type names to a Go type. name is used for object
+// types. A "null" type makes the result a pointer. More than two types
+// yield any.
 func GetGoType(in []string, name string, opts ...GoTypeOption) (string, error) {
 	if len(in) > 2 {
 		return "any", nil
@@ -597,6 +658,7 @@ func GetGoType(in []string, name string, opts ...GoTypeOption) (string, error) {
 	return fmt.Sprintf("%s%s", options.optional, typ), nil
 }
 
+// WithOmitEmpty adds the omitempty option if val is true.
 func WithOmitEmpty(val bool) GoTagOption {
 	return func(s *[]string) {
 		if val {
@@ -605,6 +667,7 @@ func WithOmitEmpty(val bool) GoTagOption {
 	}
 }
 
+// WithOpaque adds the opaque option if goTypeName is an opaque type.
 func WithOpaque(goTypeName string) GoTagOption {
 	return func(s *[]string) {
 		if slices.Contains(opaqueTypes, strings.TrimLeft(goTypeName, "*")) {
@@ -613,6 +676,7 @@ func WithOpaque(goTypeName string) GoTagOption {
 	}
 }
 
+// GetTags returns a bson struct tag for the field explicitName.
 func GetTags(explicitName string, opts ...GoTagOption) string {
 	tags := make([]string, 0)
 	tags = append(tags, explicitName)
@@ -624,6 +688,8 @@ func GetTags(explicitName string, opts ...GoTagOption) string {
 	return fmt.Sprintf("`bson:\"%s\"`", strings.Join(tags, ","))
 }
 
+// deepCopy merges src into dest. Fields of a type present in both are
+// merged, with src taking precedence.
 func deepCopy(dest Types, src Types) {
 	for key, value := range src {
 		if _, ok := dest[key]; !ok {
@@ -634,6 +700,7 @@ func deepCopy(dest Types, src Types) {
 	}
 }
 
+// flaten concatenates in into a single identifier.
 func flaten(in []string) string {
 	out := bytes.NewBufferString("")
 
@@ -644,10 +711,13 @@ func flaten(in []string) string {
 	return out.String()
 }
 
+// MakePascalCase converts str to PascalCase.
 func MakePascalCase(str string) string {
 	return strcase.ToCamel(str)
 }
 
+// GetCombinatorType returns the combinator named by the fully qualified type
+// name in, and reports whether in names a combinator.
 func GetCombinatorType(in string) (CombinatorType, bool) {
 	_, str, _ := strings.CutLast(strings.TrimFunc(in, func(r rune) bool { return r == '[' || r == ']' }), ".")
 	typ := CombinatorType(str)
@@ -663,6 +733,8 @@ func GetCombinatorType(in string) (CombinatorType, bool) {
 	}
 }
 
+// SplitInTwo splits s into its leading pointer and slice prefix (matched by
+// re) and the remaining element type.
 func SplitInTwo(re *regexp.Regexp, s string) []string {
 	n := 2
 
@@ -688,6 +760,8 @@ func SplitInTwo(re *regexp.Regexp, s string) []string {
 	return strings
 }
 
+// Exec runs the command name with args in dir, with a one-minute timeout.
+// On failure, the error includes the command's standard error.
 func Exec(name string, dir string, args ...string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()

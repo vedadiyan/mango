@@ -1,3 +1,17 @@
+// Copyright 2026 Pouya Vedadiyan. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package codegen
 
 import (
@@ -8,17 +22,31 @@ import (
 )
 
 const (
+	// schemaType is the fully qualified name of the type a schema
+	// definition must return.
 	schemaType = "github.com/vedadiyan/mango/static.Schema"
 )
 
 type (
+	// Schema describes a schema definition found in source code.
 	Schema struct {
-		Package    string
-		Name       string
-		TypedParam TypedParam
+		Package    string     // name of the package declaring the schema
+		Name       string     // schema name
+		TypedParam TypedParam // parsed schema literal
 	}
 )
 
+// GetSchemas returns the schema definitions found in the parsed package.
+//
+// A schema definition is an exported function whose last statement returns
+// a static.Schema composite literal, either alone or preceded by a string
+// literal giving the schema's name:
+//
+//	func DefineUser() static.Schema { return static.Schema{...} }
+//	func DefineUser() (string, static.Schema) { return "users", static.Schema{...} }
+//
+// Without an explicit name, the function name with any "Define" prefix
+// removed is used.
 func GetSchemas(ParserContext *ParserContext) ([]Schema, error) {
 	fns, err := ParserContext.ExtractFuncs()
 	if err != nil {
@@ -26,6 +54,7 @@ func GetSchemas(ParserContext *ParserContext) ([]Schema, error) {
 	}
 	out := make([]Schema, 0)
 	for _, fn := range fns {
+		// Only exported functions returning one or two values are candidates.
 		ident, ok := ParserContext.Info.Defs[fn.Name]
 		if !ok {
 			continue
@@ -38,6 +67,7 @@ func GetSchemas(ParserContext *ParserContext) ([]Schema, error) {
 			continue
 		}
 
+		// The definition is taken from the function's final return statement.
 		lastStatement := fn.Body.List[len(fn.Body.List)-1]
 		returnStatement, ok := lastStatement.(*ast.ReturnStmt)
 		if !ok {
@@ -47,6 +77,7 @@ func GetSchemas(ParserContext *ParserContext) ([]Schema, error) {
 		definition := returnStatement.Results[0]
 		name := strings.TrimPrefix(fn.Name.String(), "Define")
 
+		// With two results, the first is the schema name.
 		if len(returnStatement.Results) == 2 {
 			val, ok := returnStatement.Results[0].(*ast.BasicLit)
 			if !ok {

@@ -97,7 +97,7 @@ func TestCodec(t *testing.T) {
 
 	var val output
 
-	if err := RegisterCodec[output](r, WithCircRefIgnore()); err != nil {
+	if err := RegisterCodec[output](r, WithCircRefHandle()); err != nil {
 		t.FailNow()
 	}
 

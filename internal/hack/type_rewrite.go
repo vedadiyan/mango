@@ -1,3 +1,19 @@
+// Copyright 2026 Pouya Vedadiyan. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Package hack rewrites Go types at runtime so that anonymous (embedded)
+// struct fields are inlined for BSON encoding.
 package hack
 
 import (
@@ -10,49 +26,85 @@ import (
 )
 
 type (
+	// Metadata is a marker interface used to attach struct tags to a type.
+	// Fields whose type implements Metadata are excluded from encoding.
 	Metadata interface {
 		dummyMethod(Metadata)
 	}
 
-	CircularReferenceHandlingPolicy int
+	// Rewriter holds the state of a single Rewrite call: circular-reference
+	// tracking, the active policy, and deferred patch handlers.
+	Rewriter struct {
+		crd      circularReferenceDetector
+		crhp     CircRefHndlrPolicy
+		handlers circularReferenceHandlers
+	}
+
+	// StructField describes a single field of a struct being rewritten.
+	StructField struct {
+		Field      *reflect.StructField
+		FieldIndex int
+		StructType *reflect.Type
+		Rewriter   *Rewriter
+	}
+
+	// CircRefHndlrPolicy controls how Rewrite handles circular type references.
+	CircRefHndlrPolicy int
 )
 
 const (
-	CirRefHdlrPolicyBlock  CircularReferenceHandlingPolicy = 0
-	CirRefHdlrPolicyIgnore CircularReferenceHandlingPolicy = 1
-	CirRefHdlrPolicyHandle CircularReferenceHandlingPolicy = 3
+	// CircRefHandlrPolicyBlock causes Rewrite to return an error when a
+	// circular reference is found.
+	CircRefHandlrPolicyBlock CircRefHndlrPolicy = 0
+
+	// CircRefHandlrPolicyIgnore replaces circular fields with an unexported
+	// placeholder.
+	CircRefHandlrPolicyIgnore CircRefHndlrPolicy = 1
+
+	// CircRefHandlrPolicyHandle replaces circular fields with a placeholder
+	// that is patched to the rewritten type once rewriting completes.
+	CircRefHandlrPolicyHandle CircRefHndlrPolicy = 3
 )
 
 var (
 	metadataType = reflect.TypeFor[Metadata]()
-	typeCache    = make(map[reflect.Type]reflect.Type)
-	emptyType    = reflect.PointerTo(reflect.TypeFor[struct{}]())
+	typeCache    = make(map[reflect.Type]reflect.Type) // guarded by mut
+	nilType      = reflect.TypeFor[unsafe.Pointer]()   // placeholder for circular fields
 	mut          sync.Mutex
 )
 
-func Rewrite(src reflect.Type, crhp CircularReferenceHandlingPolicy) (reflect.Type, error) {
+// Rewrite returns a dynamically constructed equivalent of src in which
+// anonymous struct fields are inlined. crhp determines how circular
+// references are handled. Results are cached, and Rewrite is safe for
+// concurrent use.
+func Rewrite(src reflect.Type, crhp CircRefHndlrPolicy) (reflect.Type, error) {
 	mut.Lock()
 	defer mut.Unlock()
 	if value, ok := typeCache[src]; ok {
 		return value, nil
 	}
-	typ, crh, err := typeRewrite(src, make(circularReferenceDetector), crhp)
+
+	w := &Rewriter{}
+	w.crd = make(circularReferenceDetector)
+	w.crhp = crhp
+
+	typ, err := w.typeRewrite(src)
 	if err != nil {
 		return nil, err
 	}
-	if err := crh.inject(); err != nil {
+	if err := w.handlers.inject(); err != nil {
 		return nil, err
 	}
 	typeCache[src] = typ
 	return typ, nil
 }
 
-func typeRewrite(src reflect.Type, cld circularReferenceDetector, crhp CircularReferenceHandlingPolicy) (reflect.Type, circularReferenceHandlers, error) {
+// typeRewrite recursively rewrites src, descending into slices, arrays and
+// structs while preserving pointer indirection. The result is cached.
+func (w *Rewriter) typeRewrite(src reflect.Type) (reflect.Type, error) {
 	if value, ok := typeCache[src]; ok {
-		return value, nil, nil
+		return value, nil
 	}
-
-	var localCrh circularReferenceHandlers
 
 	indirectType, n := indirect(src)
 	var out reflect.Type
@@ -60,30 +112,27 @@ func typeRewrite(src reflect.Type, cld circularReferenceDetector, crhp CircularR
 	switch indirectType.Kind() {
 	case reflect.Slice:
 		{
-			res, crh, err := typeRewrite(indirectType.Elem(), cld, crhp)
+			res, err := w.typeRewrite(indirectType.Elem())
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 			out = reflect.SliceOf(res)
-			localCrh = append(localCrh, crh...)
 		}
 	case reflect.Array:
 		{
-			res, crh, err := typeRewrite(indirectType.Elem(), cld, crhp)
+			res, err := w.typeRewrite(indirectType.Elem())
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 			out = reflect.ArrayOf(indirectType.Len(), res)
-			localCrh = append(localCrh, crh...)
 		}
 	case reflect.Struct:
 		{
-			res, crh, err := structRewrite(indirectType, cld, crhp)
+			res, err := w.structRewrite(indirectType)
 			if err != nil {
-				return nil, crh, err
+				return nil, err
 			}
 			out = res
-			localCrh = append(localCrh, crh...)
 		}
 	default:
 		{
@@ -93,119 +142,113 @@ func typeRewrite(src reflect.Type, cld circularReferenceDetector, crhp CircularR
 
 	if n == 0 {
 		typeCache[src] = out
-		return out, localCrh, nil
+		return out, nil
 	}
 	ptr := pointerTo(out, n)
 	typeCache[src] = ptr
-	return ptr, localCrh, nil
+	return ptr, nil
 }
 
-func structRewrite(src reflect.Type, cld circularReferenceDetector, crhp CircularReferenceHandlingPolicy) (reflect.Type, circularReferenceHandlers, error) {
+// structRewrite rebuilds the struct type src, rewriting each field with
+// StructField.Build. src is tracked for circular-reference detection while
+// its fields are processed.
+func (w *Rewriter) structRewrite(src reflect.Type) (reflect.Type, error) {
 	if value, ok := typeCache[src]; ok {
-		return value, nil, nil
+		return value, nil
 	}
 
 	var finalResult reflect.Type
-	var crh circularReferenceHandlers
 	out := make([]reflect.StructField, 0)
-	cld.track(src, &finalResult)
-	defer cld.release(src)
+	w.crd.track(src, &finalResult)
+	defer w.crd.release(src)
 
 	for i := range src.NumField() {
 		field := src.Field(i)
-		typ := field.Type
-
-		ityp := concreteType(typ)
-		if val, ok := cld.has(ityp); ok {
-			switch crhp {
-			case CirRefHdlrPolicyHandle:
-				{
-					crh = append(crh, func() error {
-						return abiPatch(&finalResult, i, typ, val)
-					})
-					out = append(out, reflect.StructField{
-						Name:      field.Name,
-						Anonymous: false,
-						Index:     field.Index,
-						Offset:    field.Offset,
-						PkgPath:   field.PkgPath,
-						Type:      emptyType,
-						Tag:       field.Tag,
-					})
-				}
-			case CirRefHdlrPolicyIgnore:
-				{
-					out = append(out, reflect.StructField{
-						Name:      field.Name,
-						Anonymous: false,
-						Index:     field.Index,
-						Offset:    field.Offset,
-						PkgPath:   field.PkgPath,
-						Type:      reflect.TypeFor[unsafe.Pointer](),
-						Tag:       reflect.StructTag(`bson:"-"`),
-					})
-				}
-			default:
-				{
-					return nil, nil, fmt.Errorf("circular references are not allowed")
-				}
-			}
-			continue
+		structField := StructField{&field, i, &finalResult, w}
+		f, err := structField.Build()
+		if err != nil {
+			return nil, err
 		}
-
-		if val, ok := field.Tag.Lookup("bson"); !ok || !isOpaque(val) {
-			res, fn, err := typeRewrite(field.Type, cld, crhp)
-			if err != nil {
-				return nil, nil, err
-			}
-			typ = res
-			crh = append(crh, fn...)
-		}
-
-		if !field.Anonymous {
-			tag := field.Tag
-			if tagValue, ok := isMetadata(field.Type); ok {
-				tag = tagValue
-			}
-			out = append(out, reflect.StructField{
-				Name:      field.Name,
-				Anonymous: false,
-				Index:     field.Index,
-				Offset:    field.Offset,
-				PkgPath:   field.PkgPath,
-				Type:      typ,
-				Tag:       tag,
-			})
-			continue
-		}
-		if field.Type.Implements(metadataType) {
-			out = append(out, reflect.StructField{
-				Name:      field.Name,
-				Anonymous: false,
-				Index:     field.Index,
-				Offset:    field.Offset,
-				PkgPath:   field.PkgPath,
-				Type:      typ,
-				Tag:       reflect.StructTag(`bson:"-"`),
-			})
-			continue
-		}
-		out = append(out, reflect.StructField{
-			Name:      field.Name,
-			Anonymous: true,
-			Index:     field.Index,
-			Offset:    field.Offset,
-			PkgPath:   field.PkgPath,
-			Type:      typ,
-			Tag:       reflect.StructTag(`bson:",inline"`),
-		})
-
+		out = append(out, *f)
 	}
 	finalResult = reflect.StructOf(out)
 	typeCache[src] = finalResult
-	return finalResult, crh, nil
+	return finalResult, nil
 }
 
+// Build returns the rewritten field. Fields whose bson tag includes the
+// "opaque" option are returned unchanged. Fields that refer to a struct
+// currently being rewritten are handled according to the Rewriter's
+// CircRefHndlrPolicy.
+func (sf *StructField) Build() (*reflect.StructField, error) {
+	// Opaque fields are left unchanged.
+	if tag, ok := sf.Field.Tag.Lookup("bson"); ok && isOpaque(tag) {
+		return sf.Field, nil
+	}
+
+	// Not a circular reference: rewrite the field type normally.
+	val, ok := sf.Rewriter.crd.has(concreteType(sf.Field.Type))
+	if !ok {
+		res, err := sf.Rewriter.typeRewrite(sf.Field.Type)
+		if err != nil {
+			return nil, err
+		}
+		sf.Field.Type = res
+		sf.Field.Tag = getTagValue(sf.Field)
+		return sf.Field, nil
+	}
+
+	// Circular reference: apply the configured policy.
+	if sf.Rewriter.crhp == CircRefHandlrPolicyBlock {
+		return nil, fmt.Errorf("circular references are not allowed")
+	}
+
+	// Defer patching the field type until all types have been built.
+	if sf.Rewriter.crhp == CircRefHandlrPolicyHandle {
+		ref := sf.Field.Type
+		sf.Rewriter.handlers = append(sf.Rewriter.handlers, func() error {
+			return abiPatch(sf.StructType, sf.FieldIndex, ref, val)
+		})
+	}
+
+	// Hide the field by making it blank and unexported.
+	if sf.Rewriter.crhp == CircRefHandlrPolicyIgnore {
+		sf.Field.Name = "_"
+		sf.Field.PkgPath = "_"
+	}
+
+	sf.Field.Type = nilType
+	return sf.Field, nil
+}
+
+// getTagValue returns the struct tag for a rewritten field. In order of
+// precedence:
+//   - the tag supplied through Metadata, for non-anonymous fields;
+//   - `bson:"-"` for Metadata fields and blank (_) fields;
+//   - `bson:",inline"` for anonymous fields;
+//   - otherwise, the field's original tag.
+func getTagValue(field *reflect.StructField) reflect.StructTag {
+	// A Metadata tag overrides the field's own tag, allowing tags in places
+	// the Go language does not permit them.
+	if tagValue, ok := isMetadata(field.Type); ok && !field.Anonymous {
+		return tagValue
+	}
+
+	// Metadata fields are used for tagging only and are never encoded.
+	if field.Type.Implements(metadataType) || field.Name == "_" {
+		return reflect.StructTag(`bson:"-"`)
+	}
+
+	if field.Anonymous {
+		return reflect.StructTag(`bson:",inline"`)
+	}
+
+	return field.Tag
+}
+
+// isMetadata reports whether src, or the element type of a pointer, slice or
+// array, embeds a Metadata type. If so, it returns the tag declared on that
+// type's Metadata field.
 func isMetadata(src reflect.Type) (reflect.StructTag, bool) {
 	switch src.Kind() {
 	case reflect.Pointer:
@@ -237,6 +280,7 @@ func isMetadata(src reflect.Type) (reflect.StructTag, bool) {
 	}
 }
 
+// isOpaque reports whether the bson tag value str includes the "opaque" option.
 func isOpaque(str string) bool {
 	return slices.Contains(strings.Split(str, ","), "opaque")
 }
