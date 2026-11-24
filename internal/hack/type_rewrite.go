@@ -117,34 +117,39 @@ func structRewrite(src reflect.Type, cld circularReferenceDetector, crhp Circula
 
 		ityp := concreteType(typ)
 		if val, ok := cld.has(ityp); ok {
-			if crhp == CirRefHdlrPolicyBlock {
-				return nil, nil, fmt.Errorf("circular references are not allowed")
+			switch crhp {
+			case CirRefHdlrPolicyHandle:
+				{
+					crh = append(crh, func() error {
+						return abiPatch(&finalResult, i, typ, val)
+					})
+					out = append(out, reflect.StructField{
+						Name:      field.Name,
+						Anonymous: false,
+						Index:     field.Index,
+						Offset:    field.Offset,
+						PkgPath:   field.PkgPath,
+						Type:      emptyType,
+						Tag:       field.Tag,
+					})
+				}
+			case CirRefHdlrPolicyIgnore:
+				{
+					out = append(out, reflect.StructField{
+						Name:      field.Name,
+						Anonymous: false,
+						Index:     field.Index,
+						Offset:    field.Offset,
+						PkgPath:   field.PkgPath,
+						Type:      reflect.TypeFor[unsafe.Pointer](),
+						Tag:       reflect.StructTag(`bson:"-"`),
+					})
+				}
+			default:
+				{
+					return nil, nil, fmt.Errorf("circular references are not allowed")
+				}
 			}
-			if crhp == CirRefHdlrPolicyHandle {
-				crh = append(crh, func() error {
-					return abiPatch(&finalResult, i, typ, val)
-				})
-				out = append(out, reflect.StructField{
-					Name:      field.Name,
-					Anonymous: false,
-					Index:     field.Index,
-					Offset:    field.Offset,
-					PkgPath:   field.PkgPath,
-					Type:      emptyType,
-					Tag:       field.Tag,
-				})
-				continue
-			}
-
-			out = append(out, reflect.StructField{
-				Name:      field.Name,
-				Anonymous: false,
-				Index:     field.Index,
-				Offset:    field.Offset,
-				PkgPath:   field.PkgPath,
-				Type:      reflect.TypeFor[unsafe.Pointer](),
-				Tag:       reflect.StructTag(`bson:"-"`),
-			})
 			continue
 		}
 
