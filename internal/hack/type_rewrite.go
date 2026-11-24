@@ -35,9 +35,9 @@ type (
 	// Rewriter holds the state of a single Rewrite call: circular-reference
 	// tracking, the active policy, and deferred patch handlers.
 	Rewriter struct {
-		ld  LoopDetector
-		lhp LoopHandlerPolicy
-		lh  LoopHandler
+		loopDetector      LoopDetector
+		loopHandlerPolicy LoopHandlerPolicy
+		loopHandler       LoopHandler
 	}
 
 	// StructField describes a single field of a struct being rewritten.
@@ -85,14 +85,14 @@ func Rewrite(src reflect.Type, crhp LoopHandlerPolicy) (reflect.Type, error) {
 	}
 
 	w := &Rewriter{}
-	w.ld = make(LoopDetector)
-	w.lhp = crhp
+	w.loopDetector = make(LoopDetector)
+	w.loopHandlerPolicy = crhp
 
 	typ, err := w.typeRewrite(src)
 	if err != nil {
 		return nil, err
 	}
-	if err := w.lh.inject(); err != nil {
+	if err := w.loopHandler.inject(); err != nil {
 		return nil, err
 	}
 	typeCache[src] = typ
@@ -159,8 +159,8 @@ func (w *Rewriter) structRewrite(src reflect.Type) (reflect.Type, error) {
 
 	var finalResult reflect.Type
 	out := make([]reflect.StructField, 0)
-	w.ld.track(src, &finalResult)
-	defer w.ld.release(src)
+	w.loopDetector.track(src, &finalResult)
+	defer w.loopDetector.release(src)
 
 	for i := range src.NumField() {
 		field := src.Field(i)
@@ -187,7 +187,7 @@ func (sf *StructField) Build() (*reflect.StructField, error) {
 	}
 
 	// Not a circular reference: rewrite the field type normally.
-	val, ok := sf.rewriter.ld.has(concreteType(sf.field.Type))
+	val, ok := sf.rewriter.loopDetector.has(concreteType(sf.field.Type))
 	if !ok {
 		res, err := sf.rewriter.typeRewrite(sf.field.Type)
 		if err != nil {
@@ -199,20 +199,20 @@ func (sf *StructField) Build() (*reflect.StructField, error) {
 	}
 
 	// Circular reference: apply the configured policy.
-	if sf.rewriter.lhp == LoopHandlerPolicyBlock {
+	if sf.rewriter.loopHandlerPolicy == LoopHandlerPolicyBlock {
 		return nil, fmt.Errorf("circular references are not allowed")
 	}
 
 	// Defer patching the field type until all types have been built.
-	if sf.rewriter.lhp == LoopHandlerPolicyHandle {
+	if sf.rewriter.loopHandlerPolicy == LoopHandlerPolicyHandle {
 		ref := sf.field.Type
-		sf.rewriter.lh = append(sf.rewriter.lh, func() error {
+		sf.rewriter.loopHandler = append(sf.rewriter.loopHandler, func() error {
 			return abiPatch(sf.structType, sf.fieldIndex, ref, val)
 		})
 	}
 
 	// Hide the field by making it blank and unexported.
-	if sf.rewriter.lhp == LoopHandlerPolicyIgnore {
+	if sf.rewriter.loopHandlerPolicy == LoopHandlerPolicyIgnore {
 		sf.field.Name = "_"
 		sf.field.PkgPath = "_"
 	}
