@@ -37,7 +37,7 @@ type (
 	}
 
 	autoInlinerCodecOptions struct {
-		crhp     hack.CircRefHndlrPolicy
+		crhp     hack.LoopHandlerPolicy
 		registry *bson.Registry
 	}
 
@@ -51,14 +51,14 @@ var circRefHandlerOnce sync.Once
 // reference. This is the default.
 func WithCircRefBlock() AutoInlinerCodecOption {
 	return func(aico *autoInlinerCodecOptions) {
-		aico.crhp = hack.CircRefHandlrPolicyBlock
+		aico.crhp = hack.LoopHandlerPolicyBlock
 	}
 }
 
 // WithCircRefIgnore excludes circular fields from encoding and decoding.
 func WithCircRefIgnore() AutoInlinerCodecOption {
 	return func(aico *autoInlinerCodecOptions) {
-		aico.crhp = hack.CircRefHandlrPolicyIgnore
+		aico.crhp = hack.LoopHandlerPolicyIgnore
 	}
 }
 
@@ -69,7 +69,7 @@ func WithCircRefIgnore() AutoInlinerCodecOption {
 // This relies on Go runtime internals and may break with new Go releases.
 func WithCircRefHandle() AutoInlinerCodecOption {
 	return func(aico *autoInlinerCodecOptions) {
-		aico.crhp = hack.CircRefHandlrPolicyHandle
+		aico.crhp = hack.LoopHandlerPolicyHandle
 		circRefHandlerOnce.Do(func() {
 			hack.EnableAbiPatch(true)
 		})

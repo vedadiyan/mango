@@ -35,9 +35,9 @@ type (
 	// Rewriter holds the state of a single Rewrite call: circular-reference
 	// tracking, the active policy, and deferred patch handlers.
 	Rewriter struct {
-		crd      circularReferenceDetector
-		crhp     CircRefHndlrPolicy
-		handlers circularReferenceHandlers
+		ld  LoopDetector
+		lhp LoopHandlerPolicy
+		lh  LoopHandler
 	}
 
 	// StructField describes a single field of a struct being rewritten.
@@ -48,22 +48,22 @@ type (
 		Rewriter   *Rewriter
 	}
 
-	// CircRefHndlrPolicy controls how Rewrite handles circular type references.
-	CircRefHndlrPolicy int
+	// LoopHandlerPolicy controls how Rewrite handles circular type references.
+	LoopHandlerPolicy int
 )
 
 const (
-	// CircRefHandlrPolicyBlock causes Rewrite to return an error when a
+	// LoopHandlerPolicyBlock causes Rewrite to return an error when a
 	// circular reference is found.
-	CircRefHandlrPolicyBlock CircRefHndlrPolicy = 0
+	LoopHandlerPolicyBlock LoopHandlerPolicy = 0
 
-	// CircRefHandlrPolicyIgnore replaces circular fields with an unexported
+	// LoopHandlerPolicyIgnore replaces circular fields with an unexported
 	// placeholder.
-	CircRefHandlrPolicyIgnore CircRefHndlrPolicy = 1
+	LoopHandlerPolicyIgnore LoopHandlerPolicy = 1
 
-	// CircRefHandlrPolicyHandle replaces circular fields with a placeholder
+	// LoopHandlerPolicyHandle replaces circular fields with a placeholder
 	// that is patched to the rewritten type once rewriting completes.
-	CircRefHandlrPolicyHandle CircRefHndlrPolicy = 3
+	LoopHandlerPolicyHandle LoopHandlerPolicy = 3
 )
 
 var (
@@ -77,7 +77,7 @@ var (
 // anonymous struct fields are inlined. crhp determines how circular
 // references are handled. Results are cached, and Rewrite is safe for
 // concurrent use.
-func Rewrite(src reflect.Type, crhp CircRefHndlrPolicy) (reflect.Type, error) {
+func Rewrite(src reflect.Type, crhp LoopHandlerPolicy) (reflect.Type, error) {
 	mut.Lock()
 	defer mut.Unlock()
 	if value, ok := typeCache[src]; ok {
@@ -85,14 +85,14 @@ func Rewrite(src reflect.Type, crhp CircRefHndlrPolicy) (reflect.Type, error) {
 	}
 
 	w := &Rewriter{}
-	w.crd = make(circularReferenceDetector)
-	w.crhp = crhp
+	w.ld = make(LoopDetector)
+	w.lhp = crhp
 
 	typ, err := w.typeRewrite(src)
 	if err != nil {
 		return nil, err
 	}
-	if err := w.handlers.inject(); err != nil {
+	if err := w.lh.inject(); err != nil {
 		return nil, err
 	}
 	typeCache[src] = typ
@@ -159,8 +159,8 @@ func (w *Rewriter) structRewrite(src reflect.Type) (reflect.Type, error) {
 
 	var finalResult reflect.Type
 	out := make([]reflect.StructField, 0)
-	w.crd.track(src, &finalResult)
-	defer w.crd.release(src)
+	w.ld.track(src, &finalResult)
+	defer w.ld.release(src)
 
 	for i := range src.NumField() {
 		field := src.Field(i)
@@ -187,7 +187,7 @@ func (sf *StructField) Build() (*reflect.StructField, error) {
 	}
 
 	// Not a circular reference: rewrite the field type normally.
-	val, ok := sf.Rewriter.crd.has(concreteType(sf.Field.Type))
+	val, ok := sf.Rewriter.ld.has(concreteType(sf.Field.Type))
 	if !ok {
 		res, err := sf.Rewriter.typeRewrite(sf.Field.Type)
 		if err != nil {
@@ -199,20 +199,20 @@ func (sf *StructField) Build() (*reflect.StructField, error) {
 	}
 
 	// Circular reference: apply the configured policy.
-	if sf.Rewriter.crhp == CircRefHandlrPolicyBlock {
+	if sf.Rewriter.lhp == LoopHandlerPolicyBlock {
 		return nil, fmt.Errorf("circular references are not allowed")
 	}
 
 	// Defer patching the field type until all types have been built.
-	if sf.Rewriter.crhp == CircRefHandlrPolicyHandle {
+	if sf.Rewriter.lhp == LoopHandlerPolicyHandle {
 		ref := sf.Field.Type
-		sf.Rewriter.handlers = append(sf.Rewriter.handlers, func() error {
+		sf.Rewriter.lh = append(sf.Rewriter.lh, func() error {
 			return abiPatch(sf.StructType, sf.FieldIndex, ref, val)
 		})
 	}
 
 	// Hide the field by making it blank and unexported.
-	if sf.Rewriter.crhp == CircRefHandlrPolicyIgnore {
+	if sf.Rewriter.lhp == LoopHandlerPolicyIgnore {
 		sf.Field.Name = "_"
 		sf.Field.PkgPath = "_"
 	}

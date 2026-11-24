@@ -17,37 +17,37 @@ package hack
 import "reflect"
 
 type (
-	// circularReferenceDetector records the struct types currently being
+	// LoopDetector records the struct types currently being
 	// rewritten. Each entry maps a source type to the location where its
 	// rewritten type will be stored once it is built.
-	circularReferenceDetector map[reflect.Type]*reflect.Type
+	LoopDetector map[reflect.Type]*reflect.Type
 
-	// circularReferenceHandlers holds deferred patches for circular fields,
+	// LoopHandler holds deferred patches for circular fields,
 	// applied after all types have been built.
-	circularReferenceHandlers []func() error
+	LoopHandler []func() error
 )
 
 // track marks typ as in progress. finalType points to where its rewritten
 // type will be stored.
-func (crd circularReferenceDetector) track(typ reflect.Type, finalType *reflect.Type) {
-	crd[typ] = finalType
+func (ld LoopDetector) track(typ reflect.Type, finalType *reflect.Type) {
+	ld[typ] = finalType
 }
 
 // has reports whether typ is in progress and, if so, returns the location
 // of its rewritten type.
-func (crd circularReferenceDetector) has(typ reflect.Type) (*reflect.Type, bool) {
-	out, ok := crd[typ]
+func (ld LoopDetector) has(typ reflect.Type) (*reflect.Type, bool) {
+	out, ok := ld[typ]
 	return out, ok
 }
 
 // release marks typ as no longer in progress.
-func (crd circularReferenceDetector) release(typ reflect.Type) {
-	delete(crd, typ)
+func (ld LoopDetector) release(typ reflect.Type) {
+	delete(ld, typ)
 }
 
 // inject runs each handler in order and stops at the first error.
-func (crh circularReferenceHandlers) inject() error {
-	for _, fn := range crh {
+func (lh LoopHandler) inject() error {
+	for _, fn := range lh {
 		if err := fn(); err != nil {
 			return err
 		}
