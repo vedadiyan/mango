@@ -2,6 +2,7 @@ package codec
 
 import (
 	"reflect"
+	"sync"
 
 	"github.com/vedadiyan/mango/internal/hack"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -12,14 +13,42 @@ type (
 		srcType     reflect.Type
 		dynamicType reflect.Type
 	}
+
+	autoInlinerCodecOptions struct {
+		crhp hack.CircularReferenceHandlingPolicy
+	}
+
+	AutoInlinerCodecOption func(*autoInlinerCodecOptions)
 )
 
 var (
-	bsonRaw = reflect.TypeFor[bson.Raw]()
+	bsonRaw            = reflect.TypeFor[bson.Raw]()
+	circRefHandlerOnce sync.Once
 )
 
-func RegisterCodec[T any](registry *bson.Registry) error {
-	alc, err := NewAutoInlinerCodec[T]()
+func WithCircRefBlock() AutoInlinerCodecOption {
+	return func(aico *autoInlinerCodecOptions) {
+		aico.crhp = hack.CirRefHdlrPolicyBlock
+	}
+}
+
+func WithCircRefIgnore() AutoInlinerCodecOption {
+	return func(aico *autoInlinerCodecOptions) {
+		aico.crhp = hack.CirRefHdlrPolicyIgnore
+	}
+}
+
+func WithCircRefHandle() AutoInlinerCodecOption {
+	return func(aico *autoInlinerCodecOptions) {
+		aico.crhp = hack.CirRefHdlrPolicyHandle
+		circRefHandlerOnce.Do(func() {
+			hack.EnableAbiPatch(true)
+		})
+	}
+}
+
+func RegisterCodec[T any](registry *bson.Registry, opts ...AutoInlinerCodecOption) error {
+	alc, err := NewAutoInlinerCodec[T](opts...)
 	if err != nil {
 		return err
 	}
@@ -33,6 +62,11 @@ func RegisterCodec[T any](registry *bson.Registry) error {
 	if err != nil {
 		return err
 	}
+
+	registry.RegisterTypeDecoder(reflect.PointerTo(reflect.TypeFor[struct{}]()), bson.ValueDecoderFunc(func(dc bson.DecodeContext, vr bson.ValueReader, v reflect.Value) error {
+		return vr.Skip()
+
+	}))
 
 	registry.RegisterTypeEncoder(alc.srcType, bson.ValueEncoderFunc(
 		func(ec bson.EncodeContext, vw bson.ValueWriter, v reflect.Value) error {
@@ -64,9 +98,14 @@ func RegisterCodec[T any](registry *bson.Registry) error {
 	return nil
 }
 
-func NewAutoInlinerCodec[T any]() (*AutoInlinerCodec[T], error) {
+func NewAutoInlinerCodec[T any](opts ...AutoInlinerCodecOption) (*AutoInlinerCodec[T], error) {
+	autoInlinerCodecOptions := &autoInlinerCodecOptions{}
+	for _, opt := range opts {
+		opt(autoInlinerCodecOptions)
+	}
+
 	srcType := reflect.TypeFor[T]()
-	dynamicType, err := hack.Rewrite(srcType)
+	dynamicType, err := hack.Rewrite(srcType, autoInlinerCodecOptions.crhp)
 	if err != nil {
 		return nil, err
 	}

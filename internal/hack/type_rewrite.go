@@ -1,16 +1,26 @@
 package hack
 
 import (
+	"fmt"
 	"reflect"
 	"slices"
 	"strings"
 	"sync"
+	"unsafe"
 )
 
 type (
 	Metadata interface {
 		dummyMethod(Metadata)
 	}
+
+	CircularReferenceHandlingPolicy int
+)
+
+const (
+	CirRefHdlrPolicyBlock  CircularReferenceHandlingPolicy = 0
+	CirRefHdlrPolicyIgnore CircularReferenceHandlingPolicy = 1
+	CirRefHdlrPolicyHandle CircularReferenceHandlingPolicy = 3
 )
 
 var (
@@ -20,13 +30,13 @@ var (
 	mut          sync.Mutex
 )
 
-func Rewrite(src reflect.Type) (reflect.Type, error) {
+func Rewrite(src reflect.Type, crhp CircularReferenceHandlingPolicy) (reflect.Type, error) {
 	mut.Lock()
 	defer mut.Unlock()
 	if value, ok := typeCache[src]; ok {
 		return value, nil
 	}
-	typ, crh, err := typeRewrite(src, make(circularReferenceDetector))
+	typ, crh, err := typeRewrite(src, make(circularReferenceDetector), crhp)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +47,7 @@ func Rewrite(src reflect.Type) (reflect.Type, error) {
 	return typ, nil
 }
 
-func typeRewrite(src reflect.Type, cld circularReferenceDetector) (reflect.Type, circularReferenceHandlers, error) {
+func typeRewrite(src reflect.Type, cld circularReferenceDetector, crhp CircularReferenceHandlingPolicy) (reflect.Type, circularReferenceHandlers, error) {
 	if value, ok := typeCache[src]; ok {
 		return value, nil, nil
 	}
@@ -50,7 +60,7 @@ func typeRewrite(src reflect.Type, cld circularReferenceDetector) (reflect.Type,
 	switch indirectType.Kind() {
 	case reflect.Slice:
 		{
-			res, crh, err := typeRewrite(indirectType.Elem(), cld)
+			res, crh, err := typeRewrite(indirectType.Elem(), cld, crhp)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -59,7 +69,7 @@ func typeRewrite(src reflect.Type, cld circularReferenceDetector) (reflect.Type,
 		}
 	case reflect.Array:
 		{
-			res, crh, err := typeRewrite(indirectType.Elem(), cld)
+			res, crh, err := typeRewrite(indirectType.Elem(), cld, crhp)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -68,7 +78,7 @@ func typeRewrite(src reflect.Type, cld circularReferenceDetector) (reflect.Type,
 		}
 	case reflect.Struct:
 		{
-			res, crh, err := structRewrite(indirectType, cld)
+			res, crh, err := structRewrite(indirectType, cld, crhp)
 			if err != nil {
 				return nil, crh, err
 			}
@@ -90,7 +100,7 @@ func typeRewrite(src reflect.Type, cld circularReferenceDetector) (reflect.Type,
 	return ptr, localCrh, nil
 }
 
-func structRewrite(src reflect.Type, cld circularReferenceDetector) (reflect.Type, circularReferenceHandlers, error) {
+func structRewrite(src reflect.Type, cld circularReferenceDetector, crhp CircularReferenceHandlingPolicy) (reflect.Type, circularReferenceHandlers, error) {
 	if value, ok := typeCache[src]; ok {
 		return value, nil, nil
 	}
@@ -107,9 +117,24 @@ func structRewrite(src reflect.Type, cld circularReferenceDetector) (reflect.Typ
 
 		ityp := concreteType(typ)
 		if val, ok := cld.has(ityp); ok {
-			crh = append(crh, func() error {
-				return abiPatch(&finalResult, i, typ, val)
-			})
+			if crhp == CirRefHdlrPolicyBlock {
+				return nil, nil, fmt.Errorf("circular references are not allowed")
+			}
+			if crhp == CirRefHdlrPolicyHandle {
+				crh = append(crh, func() error {
+					return abiPatch(&finalResult, i, typ, val)
+				})
+				out = append(out, reflect.StructField{
+					Name:      field.Name,
+					Anonymous: false,
+					Index:     field.Index,
+					Offset:    field.Offset,
+					PkgPath:   field.PkgPath,
+					Type:      emptyType,
+					Tag:       field.Tag,
+				})
+				continue
+			}
 
 			out = append(out, reflect.StructField{
 				Name:      field.Name,
@@ -117,14 +142,14 @@ func structRewrite(src reflect.Type, cld circularReferenceDetector) (reflect.Typ
 				Index:     field.Index,
 				Offset:    field.Offset,
 				PkgPath:   field.PkgPath,
-				Type:      emptyType,
-				Tag:       field.Tag,
+				Type:      reflect.TypeFor[unsafe.Pointer](),
+				Tag:       reflect.StructTag(`bson:"-"`),
 			})
 			continue
 		}
 
 		if val, ok := field.Tag.Lookup("bson"); !ok || !isOpaque(val) {
-			res, fn, err := typeRewrite(field.Type, cld)
+			res, fn, err := typeRewrite(field.Type, cld, crhp)
 			if err != nil {
 				return nil, nil, err
 			}

@@ -34,7 +34,7 @@ func (x *TestStruct) Test2() {
 }
 
 func TestAutoInliner(t *testing.T) {
-	typ, _ := hack.Rewrite(reflect.TypeFor[TestStruct]())
+	typ, _ := hack.Rewrite(reflect.TypeFor[TestStruct](), 0)
 	sample := TestStruct{
 		Name:     "Pouya",
 		UserName: "VPouya",
@@ -89,20 +89,21 @@ func TestCodec(t *testing.T) {
 
 	type output struct {
 		TestRegistryName
-		TestRegistryType
 		Recursive struct {
 			Recursive *output
 		}
+		TestRegistryType
 	}
 
 	var val output
 
-	if err := RegisterCodec[output](r); err != nil {
+	if err := RegisterCodec[output](r, WithCircRefIgnore()); err != nil {
 		t.FailNow()
 	}
 
 	query.Next(context.TODO())
 	if err := query.Decode(&val); err != nil {
+		t.Log(err)
 		t.FailNow()
 	}
 	c := 10

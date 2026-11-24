@@ -7,63 +7,48 @@ import (
 	"unsafe"
 )
 
-const (
-	abiPackage = "internal/abi"
-	abiType    = "StructType"
-)
-
 var (
 	abi    reflect.Type
 	abiErr error
 )
 
-//go:linkname typelinks reflect.typelinks
-func typelinks() (sections []unsafe.Pointer, offset [][]int32)
-
-//go:linkname resolveTypeOff reflect.resolveTypeOff
-func resolveTypeOff(rtype unsafe.Pointer, off int32) unsafe.Pointer
-
-//go:linkname toType reflect.toType
-func toType(t unsafe.Pointer) reflect.Type
-
 func init() {
-	abiErr = discoverABI()
-	if abiErr == nil {
-		abiErr = validateABI()
+	EnableAbiPatch(false)
+}
+
+func EnableAbiPatch(b bool) error {
+	if b {
+		abiErr = discoverABI()
+		if abiErr == nil {
+			abiErr = validateABI()
+		}
+		return abiErr
 	}
+	abiErr = fmt.Errorf("ABI is disabled")
+	return nil
 }
 
 func discoverABI() error {
-	sections, offsets := typelinks()
-
-	for i, base := range sections {
-		for _, off := range offsets[i] {
-			t := toType(unsafe.Add(base, uintptr(off)))
-			if t == nil || t.Kind() != reflect.Pointer {
-				continue
-			}
-
-			t = t.Elem()
-
-			if t.Kind() != reflect.Struct || t.Name() != abiType || t.PkgPath() != abiPackage {
-				continue
-			}
-
-			abi = t
-			return nil
-		}
+	target := reflect.TypeOf(reflect.TypeFor[struct{}]()).Elem()
+	if target.NumField() != 1 {
+		return fmt.Errorf("")
+	}
+	ptr := reflect.PointerTo(target.Field(0).Type)
+	method, ok := ptr.MethodByName("StructType")
+	if !ok {
+		return fmt.Errorf("")
+	}
+	if method.Type.NumOut() != 1 {
+		return fmt.Errorf("")
 	}
 
-	return fmt.Errorf("abi.StructType not found in runtime typelinks")
+	abi = method.Type.Out(0).Elem()
+	return nil
 }
 
 func validateABI() error {
 	if abi == nil {
 		return fmt.Errorf("ABI type not initialized")
-	}
-
-	if abi.Kind() != reflect.Struct || abi.Name() != abiType || abi.PkgPath() != abiPackage {
-		return fmt.Errorf("unexpected ABI StructType: %v", abi)
 	}
 
 	fields, ok := abi.FieldByName("Fields")
@@ -88,10 +73,6 @@ func validateABI() error {
 
 	if typ.Type.Kind() != reflect.Pointer {
 		return fmt.Errorf("StructField.Typ is not a pointer")
-	}
-
-	if typ.Type.Elem().Name() != "Type" || typ.Type.Elem().PkgPath() != abiPackage {
-		return fmt.Errorf("unexpected StructField.Typ type")
 	}
 
 	return nil
