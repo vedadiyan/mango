@@ -18,12 +18,14 @@ import (
 	"fmt"
 	"reflect"
 	"runtime"
+	"sync"
 	"unsafe"
 )
 
 var (
-	abi    reflect.Type // runtime's internal/abi.StructType, discovered via reflection
-	abiErr error        // non-nil if ABI patching is disabled or unavailable
+	abi     reflect.Type // runtime's internal/abi.StructType, discovered via reflection
+	abiErr  error        // non-nil if ABI patching is disabled or unavailable
+	abiMute sync.Mutex
 )
 
 func init() {
@@ -39,6 +41,8 @@ func init() {
 // ABI patching modifies runtime type metadata through unsafe operations and
 // depends on Go internals that may change between releases.
 func EnableAbiPatch(b bool) error {
+	abiMute.Lock()
+	defer abiMute.Unlock()
 	if b {
 		abiErr = discoverABI()
 		if abiErr == nil {
