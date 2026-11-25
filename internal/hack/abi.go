@@ -149,24 +149,7 @@ func abiPatch(structType *reflect.Type, fieldIndex int, fieldType reflect.Type, 
 	addr := (*unsafe.Pointer)(f.Addr().UnsafePointer())
 
 	// Rebuild the field type around the rewritten concrete type.
-	ptr := *concreteType
-
-	for _, i := range bluePrint(fieldType) {
-		switch i.Kind() {
-		case reflect.Pointer:
-			{
-				ptr = reflect.PointerTo(ptr)
-			}
-		case reflect.Slice:
-			{
-				ptr = reflect.SliceOf(ptr)
-			}
-		case reflect.Array:
-			{
-				ptr = reflect.ArrayOf(i.Len(), ptr)
-			}
-		}
-	}
+	ptr := typeCascade(fieldType, *concreteType)
 
 	*addr = reflect.ValueOf(ptr).UnsafePointer()
 

@@ -38,6 +38,7 @@ type (
 		loopDetector      LoopDetector
 		loopHandlerPolicy LoopHandlerPolicy
 		loopHandler       LoopHandler
+		cleanUp           map[reflect.Type]LoopHandlerPolicy
 	}
 
 	// StructField describes a single field of a struct being rewritten.
@@ -68,8 +69,8 @@ const (
 
 var (
 	metadataType = reflect.TypeFor[Metadata]()
-	typeCache    = make(map[reflect.Type]reflect.Type) // guarded by mut
-	nilType      = reflect.TypeFor[unsafe.Pointer]()   // placeholder for circular fields
+	typeCache    = make(map[reflect.Type]map[LoopHandlerPolicy]reflect.Type) // guarded by mut
+	nilType      = reflect.TypeFor[unsafe.Pointer]()                         // placeholder for circular fields
 	mut          sync.Mutex
 )
 
@@ -80,30 +81,54 @@ var (
 func Rewrite(src reflect.Type, crhp LoopHandlerPolicy) (reflect.Type, error) {
 	mut.Lock()
 	defer mut.Unlock()
-	if value, ok := typeCache[src]; ok {
-		return value, nil
+	value, ok := typeCache[src]
+	if !ok {
+		value = make(map[LoopHandlerPolicy]reflect.Type)
+		typeCache[src] = value
+	} else {
+		if out, ok := value[crhp]; ok {
+			return out, nil
+		}
 	}
 
 	w := &Rewriter{}
+	w.cleanUp = make(map[reflect.Type]LoopHandlerPolicy)
 	w.loopDetector = make(LoopDetector)
 	w.loopHandlerPolicy = crhp
 
-	typ, err := w.typeRewrite(src)
+	typ, err := w.typeRewrite(src, crhp)
 	if err != nil {
+		w.cleanTypeCache()
 		return nil, err
 	}
 	if err := w.loopHandler.inject(); err != nil {
+		w.cleanTypeCache()
 		return nil, err
 	}
-	typeCache[src] = typ
+	typeCache[src][crhp] = typ
 	return typ, nil
+}
+
+func (w *Rewriter) cleanTypeCache() {
+	for key, value := range w.cleanUp {
+		delete(typeCache[key], value)
+		if len(typeCache[key]) == 0 {
+			delete(typeCache, key)
+		}
+	}
 }
 
 // typeRewrite recursively rewrites src, descending into slices, arrays and
 // structs while preserving pointer indirection. The result is cached.
-func (w *Rewriter) typeRewrite(src reflect.Type) (reflect.Type, error) {
-	if value, ok := typeCache[src]; ok {
-		return value, nil
+func (w *Rewriter) typeRewrite(src reflect.Type, crhp LoopHandlerPolicy) (reflect.Type, error) {
+	value, ok := typeCache[src]
+	if !ok {
+		value = make(map[LoopHandlerPolicy]reflect.Type)
+		typeCache[src] = value
+	} else {
+		if out, ok := value[crhp]; ok {
+			return out, nil
+		}
 	}
 
 	indirectType, n := indirect(src)
@@ -112,7 +137,7 @@ func (w *Rewriter) typeRewrite(src reflect.Type) (reflect.Type, error) {
 	switch indirectType.Kind() {
 	case reflect.Slice:
 		{
-			res, err := w.typeRewrite(indirectType.Elem())
+			res, err := w.typeRewrite(indirectType.Elem(), crhp)
 			if err != nil {
 				return nil, err
 			}
@@ -120,7 +145,7 @@ func (w *Rewriter) typeRewrite(src reflect.Type) (reflect.Type, error) {
 		}
 	case reflect.Array:
 		{
-			res, err := w.typeRewrite(indirectType.Elem())
+			res, err := w.typeRewrite(indirectType.Elem(), crhp)
 			if err != nil {
 				return nil, err
 			}
@@ -128,7 +153,7 @@ func (w *Rewriter) typeRewrite(src reflect.Type) (reflect.Type, error) {
 		}
 	case reflect.Struct:
 		{
-			res, err := w.structRewrite(indirectType)
+			res, err := w.structRewrite(indirectType, crhp)
 			if err != nil {
 				return nil, err
 			}
@@ -140,21 +165,28 @@ func (w *Rewriter) typeRewrite(src reflect.Type) (reflect.Type, error) {
 		}
 	}
 
+	w.cleanUp[src] = crhp
 	if n == 0 {
-		typeCache[src] = out
+		typeCache[src][crhp] = out
 		return out, nil
 	}
 	ptr := pointerTo(out, n)
-	typeCache[src] = ptr
+	typeCache[src][crhp] = ptr
 	return ptr, nil
 }
 
 // structRewrite rebuilds the struct type src, rewriting each field with
 // StructField.Build. src is tracked for circular-reference detection while
 // its fields are processed.
-func (w *Rewriter) structRewrite(src reflect.Type) (reflect.Type, error) {
-	if value, ok := typeCache[src]; ok {
-		return value, nil
+func (w *Rewriter) structRewrite(src reflect.Type, crhp LoopHandlerPolicy) (reflect.Type, error) {
+	value, ok := typeCache[src]
+	if !ok {
+		value = make(map[LoopHandlerPolicy]reflect.Type)
+		typeCache[src] = value
+	} else {
+		if out, ok := value[crhp]; ok {
+			return out, nil
+		}
 	}
 
 	var finalResult reflect.Type
@@ -172,7 +204,8 @@ func (w *Rewriter) structRewrite(src reflect.Type) (reflect.Type, error) {
 		out = append(out, *f)
 	}
 	finalResult = reflect.StructOf(out)
-	typeCache[src] = finalResult
+	w.cleanUp[src] = crhp
+	typeCache[src][crhp] = finalResult
 	return finalResult, nil
 }
 
@@ -190,7 +223,7 @@ func (sf *StructField) Build() (*reflect.StructField, error) {
 	val, ok := sf.rewriter.loopDetector.has(concreteType(sf.field.Type))
 	if !ok {
 		sf.field.Anonymous, sf.field.Tag = getAnonymityAndTag(sf.field)
-		res, err := sf.rewriter.typeRewrite(sf.field.Type)
+		res, err := sf.rewriter.typeRewrite(sf.field.Type, sf.rewriter.loopHandlerPolicy)
 		if err != nil {
 			return nil, err
 		}
@@ -217,7 +250,8 @@ func (sf *StructField) Build() (*reflect.StructField, error) {
 		sf.field.PkgPath = "_"
 	}
 
-	sf.field.Type = nilType
+	sf.field.Type = typeCascade(sf.field.Type, nilType)
+
 	return sf.field, nil
 }
 
@@ -265,9 +299,11 @@ func isMetadata(src reflect.Type) (reflect.StructTag, bool) {
 				if f.Anonymous && f.Type == metadataType {
 					return f.Tag, true
 				}
-				tag, ok := isMetadata(f.Type)
-				if ok {
-					return tag, ok
+				if f.Type.Implements(metadataType) {
+					tag, ok := isMetadata(f.Type)
+					if ok {
+						return tag, ok
+					}
 				}
 			}
 			return "", false

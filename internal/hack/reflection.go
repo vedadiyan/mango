@@ -65,6 +65,27 @@ func concreteType(t reflect.Type) reflect.Type {
 	return t
 }
 
+func typeCascade(t reflect.Type, ct reflect.Type) reflect.Type {
+	out := ct
+	for _, i := range bluePrint(t) {
+		switch i.Kind() {
+		case reflect.Pointer:
+			{
+				out = reflect.PointerTo(out)
+			}
+		case reflect.Slice:
+			{
+				out = reflect.SliceOf(out)
+			}
+		case reflect.Array:
+			{
+				out = reflect.ArrayOf(i.Len(), out)
+			}
+		}
+	}
+	return out
+}
+
 // hasElem reports whether k is a kind that wraps an element type and is
 // unwrapped by concreteType: pointer, array or slice.
 func hasElem(k reflect.Kind) bool {
